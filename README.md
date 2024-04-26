@@ -1,5 +1,5 @@
 
-# OpenSeesRT
+# OpenSeesRT (STAIRLab fork)
 
 <img align="left" src="https://github.com/claudioperez/sdof/blob/master/docs/assets/peer-black.svg" width="250px">
 
