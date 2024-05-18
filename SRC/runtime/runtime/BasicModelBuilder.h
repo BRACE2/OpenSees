@@ -25,6 +25,7 @@
 #include <TaggedObject.h>
 class MultiSupportPattern;
 class G3_Runtime;
+class OPS_Stream;
 class ID;
 struct Tcl_Interp;
 
@@ -56,6 +57,17 @@ public:
     return addRegistryObject(typeid(T).name(), tag, &obj);
   }
 
+//void printRegistry(const char* partition, OPS_Stream& stream, int flag) const;
+  template <class T>
+  void printRegistry(OPS_Stream& stream, int flag) const 
+  {
+    auto partition = typeid(T).name();
+
+    printRegistry(partition, stream, flag);
+
+  }
+
+
   void* getRegistryObject(const char*, int tag) const;
 
   template<class T> T* getTypedObject(int tag) {
@@ -84,6 +96,9 @@ protected:
 
 // 
 private:
+  void printRegistry(const char *, OPS_Stream& stream, int flag) const ;
+
+
   int ndm; // space dimension of the mesh
   int ndf; // number of degrees of freedom per node
 

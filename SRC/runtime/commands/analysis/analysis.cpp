@@ -8,7 +8,7 @@
 //
 #include <tcl.h>
 #include <assert.h>
-#include <g3_api.h>
+#include <runtimeAPI.h>
 #include <G3_Logging.h>
 #include <StandardStream.h>
 #include <FileStream.h>
@@ -90,7 +90,7 @@ G3_AddTclAnalysisAPI(Tcl_Interp *interp, Domain* domain)
 
 
   static int ncmd = sizeof(tcl_analysis_cmds)/sizeof(char_cmd);
-  for (int i = 0; i < ncmd; i++)
+  for (int i = 0; i < ncmd; ++i)
     Tcl_CreateCommand(interp, 
         tcl_analysis_cmds[i].name, 
         tcl_analysis_cmds[i].func, 
@@ -327,7 +327,7 @@ eigenAnalysis(ClientData clientData, Tcl_Interp *interp, int argc,
     resDataSize = requiredDataSize;
   }
 
-  for (int i = 0; i < requiredDataSize; i++)
+  for (int i = 0; i < requiredDataSize; ++i)
     resDataPtr[i] = '\n';
 
   //
@@ -340,7 +340,7 @@ eigenAnalysis(ClientData clientData, Tcl_Interp *interp, int argc,
   if (result == 0) {
     const Vector &eigenvalues = domain->getEigenvalues();
     int cnt = 0;
-    for (int i = 0; i < numEigen; i++) {
+    for (int i = 0; i < numEigen; ++i) {
       cnt += sprintf(&resDataPtr[cnt], "%35.20f  ", eigenvalues[i]);
     }
 
@@ -382,14 +382,20 @@ modalDamping(ClientData clientData, Tcl_Interp *interp, int argc,
 
   if (argc < 2) {
     opserr
-        << G3_ERROR_PROMPT << "modalDampingQ ?factor - not enough arguments to command\n";
+        << G3_ERROR_PROMPT << argv[0] << " ?factor - not enough arguments to command\n";
     return TCL_ERROR;
   }
 
+  int numModes = argc - 1;
+
   if (numEigen == 0) {
-    opserr << G3_ERROR_PROMPT 
-           << "- modalDampingQ - eigen command needs to be called first\n";
-    return TCL_ERROR;
+    opserr << G3_WARN_PROMPT 
+           << "- " << argv[0] << " - eigen command needs to be called first\n";
+
+    numEigen = numModes;
+    builder->newEigenAnalysis(EigenSOE_TAGS_ArpackSOE, 0.0);
+    builder->eigen(numModes, true, true);
+    // return TCL_ERROR;
   }
 
   /* 
@@ -402,11 +408,11 @@ modalDamping(ClientData clientData, Tcl_Interp *interp, int argc,
   if (strcmp(argv[0], "modalDampingQ") == 0)
     do_tangent = false;
 
-  int numModes = argc - 1;
   double factor = 0;
   Vector modalDampingValues(numEigen);
 
   if (numModes != 1 && numModes != numEigen) {
+    // TODO: Just call eigen again?
     opserr << G3_ERROR_PROMPT << "modalDampingQ - same number of damping factors as modes must be "
               "specified\n";
 //  opserr << "                    - same damping ratio will be applied to all\n";
@@ -419,17 +425,16 @@ modalDamping(ClientData clientData, Tcl_Interp *interp, int argc,
   if (numModes == numEigen) {
 
     // read in all factors one at a time
-    for (int i = 0; i < numEigen; i++) {
+    for (int i = 0; i < numEigen; ++i) {
       if (Tcl_GetDouble(interp, argv[1 + i], &factor) != TCL_OK) {
-        opserr << G3_ERROR_PROMPT << "rayleigh alphaM? betaK? betaK0? betaKc? - could not "
-                  "read betaK? \n";
+        opserr << G3_ERROR_PROMPT << argv[0] << " - could not read factor at position "
+               << i << "\n";
         return TCL_ERROR;
       }
       modalDampingValues[i] = factor;
     }
 
   } else {
-
     //  read in one & set all factors to that value
     if (Tcl_GetDouble(interp, argv[1], &factor) != TCL_OK) {
       opserr << G3_ERROR_PROMPT 
@@ -438,7 +443,7 @@ modalDamping(ClientData clientData, Tcl_Interp *interp, int argc,
       return TCL_ERROR;
     }
 
-    for (int i = 0; i < numEigen; i++)
+    for (int i = 0; i < numEigen; ++i)
       modalDampingValues[i] = factor;
   }
 
@@ -610,7 +615,7 @@ printA(ClientData clientData, Tcl_Interp *interp, int argc, TCL_Char ** const ar
     int n = A->noRows();
     int m = A->noCols();
     if (n * m > 0) {
-      for (int i = 0; i < n; i++) {
+      for (int i = 0; i < n; ++i) {
         for (int j = 0; j < m; j++) {
           char buffer[40];
           sprintf(buffer, "%.10e ", (*A)(i, j));
@@ -676,7 +681,7 @@ printB(ClientData clientData, Tcl_Interp *interp, int argc, TCL_Char ** const ar
     if (ret) {
       int n = b.Size();
       if (n > 0) {
-        for (int i = 0; i < n; i++) {
+        for (int i = 0; i < n; ++i) {
           char buffer[40];
           sprintf(buffer, "%.10e ", b(i));
           Tcl_AppendResult(interp, buffer, NULL);
@@ -703,7 +708,7 @@ TclCommand_clearAnalysis(ClientData cd, Tcl_Interp *interp, int argc, TCL_Char *
     delete builder;
 
     static int ncmd = sizeof(tcl_analysis_cmds)/sizeof(char_cmd);
-    for (int i = 0; i < ncmd; i++)
+    for (int i = 0; i < ncmd; ++i)
       Tcl_DeleteCommand(interp, tcl_analysis_cmds[i].name);
 
     Tcl_CreateCommand(interp, "wipeAnalysis",  &wipeAnalysis, nullptr, nullptr);

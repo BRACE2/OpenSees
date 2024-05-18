@@ -9,7 +9,7 @@
 //
 #include <tcl.h>
 #include <assert.h>
-#include <g3_api.h>
+#include <runtimeAPI.h>
 #include <G3_Runtime.h>
 #include <OPS_Globals.h>
 #include <Timer.h>
@@ -367,8 +367,8 @@ OpenSeesAppInit(Tcl_Interp *interp)
 
 
 #ifndef _LINUX
-  opserr.setFloatField(SCIENTIFIC);
-  opserr.setFloatField(FIXEDD);
+  opserr.setFloatField(OPS_Stream::Float::Scientific);
+  opserr.setFloatField(OPS_Stream::Float::Fixed);
 #endif
   Tcl_Eval(interp, "rename load opensees::import;");
   Tcl_Eval(interp, "interp alias {} import {} opensees::import");

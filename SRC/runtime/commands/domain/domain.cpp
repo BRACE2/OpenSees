@@ -57,10 +57,11 @@ removeObject(ClientData clientData, Tcl_Interp *interp, int argc,
     opserr << "WARNING want - remove objectType?\n";
     return TCL_ERROR;
   }
+  const char* remove_type = Tcl_GetString(objv[1]);
 
   int tag;
-  if ((strcmp(Tcl_GetString(objv[1]), "element") == 0) || 
-      (strcmp(Tcl_GetString(objv[1]), "ele") == 0)) {
+  if ((strcmp(remove_type, "element") == 0) || 
+      (strcmp(remove_type, "ele") == 0)) {
     if (argc < 3) {
       opserr << "WARNING want - remove element eleTag?\n";
       return TCL_ERROR;
@@ -104,7 +105,8 @@ removeObject(ClientData clientData, Tcl_Interp *interp, int argc,
     }
   }
 
-  else if (strcmp(Tcl_GetString(objv[1]), "loadPattern") == 0) {
+  else if ((strcmp(remove_type, "loadPattern") == 0) ||
+           (strcmp(remove_type, "pattern") == 0)) {
     if (argc < 3) {
       opserr << "WARNING want - remove loadPattern patternTag?\n";
       return TCL_ERROR;
@@ -121,8 +123,8 @@ removeObject(ClientData clientData, Tcl_Interp *interp, int argc,
     }
   }
 #if 0
-  else if ((strcmp(Tcl_GetString(objv[1]), "TimeSeries") == 0) ||
-           (strcmp(Tcl_GetString(objv[1]), "timeSeries") == 0)) {
+  else if ((strcmp(remove_type, "TimeSeries") == 0) ||
+           (strcmp(remove_type, "timeSeries") == 0)) {
     if (argc < 3) {
       opserr << "WARNING want - remove loadPattern patternTag?\n";
       return TCL_ERROR;
@@ -139,7 +141,7 @@ removeObject(ClientData clientData, Tcl_Interp *interp, int argc,
       return TCL_ERROR;
   }
 #endif
-  else if (strcmp(Tcl_GetString(objv[1]), "parameter") == 0) {
+  else if (strcmp(remove_type, "parameter") == 0) {
     if (argc < 3) {
       opserr << "WARNING want - remove parameter paramTag?\n";
       return TCL_ERROR;
@@ -155,7 +157,7 @@ removeObject(ClientData clientData, Tcl_Interp *interp, int argc,
     }
   }
 
-  else if (strcmp(Tcl_GetString(objv[1]), "node") == 0) {
+  else if (strcmp(remove_type, "node") == 0) {
     if (argc < 3) {
       opserr << "WARNING want - remove node nodeTag?\n";
       return TCL_ERROR;
@@ -175,11 +177,11 @@ removeObject(ClientData clientData, Tcl_Interp *interp, int argc,
     }
   }
 
-  else if (strcmp(Tcl_GetString(objv[1]), "recorders") == 0) {
+  else if (strcmp(remove_type, "recorders") == 0) {
     the_domain->removeRecorders();
   }
 
-  else if (strcmp(Tcl_GetString(objv[1]), "recorder") == 0) {
+  else if (strcmp(remove_type, "recorder") == 0) {
     if (argc < 3) {
       opserr << G3_ERROR_PROMPT << "want - remove recorder recorderTag?\n";
       return TCL_ERROR;
@@ -198,8 +200,8 @@ removeObject(ClientData clientData, Tcl_Interp *interp, int argc,
     return TCL_OK;
   }
 
-  else if ((strcmp(Tcl_GetString(objv[1]), "SPconstraint") == 0) ||
-           (strcmp(Tcl_GetString(objv[1]), "sp") == 0)) {
+  else if ((strcmp(remove_type, "SPconstraint") == 0) ||
+           (strcmp(remove_type, "sp") == 0)) {
 
     return TCL_ERROR;
     //
@@ -211,7 +213,7 @@ removeObject(ClientData clientData, Tcl_Interp *interp, int argc,
 //  args[0] = strdup(objv[1]);
 //  args[1] = strdup(objv[0]);
 //  opserr << args[0] << " " << args[1] << " ";
-//  for (int i=2; i<argc; i++) {
+//  for (int i=2; i<argc; ++i) {
 //    args[i] = strdup(objv[i]);
 //    opserr << args[i] << " ";
 //  }
@@ -221,7 +223,7 @@ removeObject(ClientData clientData, Tcl_Interp *interp, int argc,
 //  Tcl_CmdInfo info;
 //  assert(Tcl_GetCommandInfo(interp, args[0], &info) == 1);
 //  int status = info.proc(info.clientData, interp, argc, args);
-//  for (int i = 0; i < argc; i++)
+//  for (int i = 0; i < argc; ++i)
 //    free((void*)args[i]);
 //  delete[] args;
 //  return status;
@@ -354,17 +356,22 @@ fixedDOFs(ClientData clientData, Tcl_Interp *interp, int argc, Tcl_Obj *const *o
   SP_Constraint *theSP;
   SP_ConstraintIter &spIter = theDomain->getDomainAndLoadPatternSPs();
 
-  int tag;
-  Vector fixed(6);
-  while ((theSP = spIter()) != 0) {
-    tag = theSP->getNodeTag();
+  Node *node = theDomain->getNode(fNode);
+  if (node == nullptr) {
+    opserr << G3_ERROR_PROMPT << " fixedDOFs fNode? - could not find node with tag " << fNode << "\n";
+    return TCL_ERROR;
+  }
+
+  Vector fixed(node->getNumberDOF());
+  while ((theSP = spIter()) != nullptr) {
+    int tag = theSP->getNodeTag();
     if (tag == fNode) {
       fixed(theSP->getDOF_Number()) = 1;
     }
   }
 
   char buffer[20];
-  for (int i = 0; i < 6; i++) {
+  for (int i = 0; i < 6; ++i) {
     if (fixed(i) == 1) {
       sprintf(buffer, "%d ", i + 1);
       Tcl_AppendResult(interp, buffer, NULL);
@@ -469,12 +476,12 @@ constrainedDOFs(ClientData clientData, Tcl_Interp *interp, int argc,
         const ID &cDOFs = theMP->getConstrainedDOFs();
         int n = cDOFs.Size();
         if (allDOFs) {
-          for (int i = 0; i < n; i++)
+          for (int i = 0; i < n; ++i)
             constrained[cDOFs(i)] = true;
 
         } else {
           const ID &rDOFs = theMP->getRetainedDOFs();
-          for (int i = 0; i < n; i++)
+          for (int i = 0; i < n; ++i)
             if (rDOF == rDOFs(i))
               constrained[cDOFs(i)] = true;
 
@@ -483,7 +490,7 @@ constrainedDOFs(ClientData clientData, Tcl_Interp *interp, int argc,
     }
   }
   char buffer[20];
-  for (int i = 0; i < MAX_NDF; i++) {
+  for (int i = 0; i < MAX_NDF; ++i) {
     if (constrained[i]) {
       sprintf(buffer, "%d ", i + 1);
       Tcl_AppendResult(interp, buffer, NULL);

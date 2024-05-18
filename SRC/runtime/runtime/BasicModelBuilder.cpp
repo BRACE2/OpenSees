@@ -20,13 +20,13 @@
 #include <string.h>
 #include <iostream>
 #include <initializer_list>
-#include <g3_api.h>
+
 #include <modeling/commands.h>
 
+#include <runtimeAPI.h>
 #include <Matrix.h>
 #include <Vector.h>
 #include <ID.h>
-
 #include <Domain.h>
 
 #include <CrdTransf.h>
@@ -64,15 +64,11 @@ BasicModelBuilder::BasicModelBuilder(Domain &theDomain, Tcl_Interp *interp, int 
 
   nodeLoadTag = 0;
   eleArgStart = 0;
-//registry  = G3_NewTable();
-//shared_registry  = G3_NewTable();
-
 
   Tcl_SetAssocData(interp, "OPS::theTclBuilder", NULL, (ClientData)this);
   Tcl_SetAssocData(interp, "OPS::theBasicModelBuilder", NULL, (ClientData)this);
   Tcl_SetAssocData(interp, "OPS::theTclDomain", NULL, (ClientData)&theDomain);
-//m_runtime = G3_getRuntime(interp);
-//G3_setDomain(m_runtime, &theDomain);
+
 }
 
 BasicModelBuilder::~BasicModelBuilder()
@@ -88,8 +84,6 @@ BasicModelBuilder::~BasicModelBuilder()
   theTclBuilder = nullptr;
   tclEnclosingPattern = nullptr;
 
-  // theTclMultiSupportPattern = 0;
-
   static int ncmd = sizeof(tcl_char_cmds)/sizeof(char_cmd);
   for (int i = 0; i < ncmd; i++)
     Tcl_DeleteCommand(theInterp, tcl_char_cmds[i].name);
@@ -99,12 +93,14 @@ BasicModelBuilder::~BasicModelBuilder()
 // CLASS METHODS
 //
 void
-BasicModelBuilder::letClobber(bool let_clobber) {no_clobber = !let_clobber;};
+BasicModelBuilder::letClobber(bool let_clobber) {
+  no_clobber = !let_clobber;
+}
 
 bool
 BasicModelBuilder::canClobber() {
   return !no_clobber;
-};
+}
 
 int BasicModelBuilder::incrNodalLoadTag(void){return ++nodeLoadTag;};
 int BasicModelBuilder::decrNodalLoadTag(void){return --nodeLoadTag;};
@@ -120,7 +116,7 @@ LoadPattern *
 BasicModelBuilder::getEnclosingPattern(void)
 {
   return tclEnclosingPattern;
-};
+}
 
 int
 BasicModelBuilder::setEnclosingPattern(LoadPattern* pat)
@@ -140,6 +136,25 @@ BasicModelBuilder::getBuilder(void) const {
   return theTclBuilder;
 }
 
+void 
+BasicModelBuilder::printRegistry(const char *partition, OPS_Stream& stream, int flag) const 
+{
+    auto iter = m_registry.find(partition);
+    if (iter == m_registry.end()) {
+      // opserr << "No objects of type \"" << partition << "\" have been created.\n";
+      return;// nullptr;
+    }
+
+    bool first = true;
+    for (auto const& [key, val] : iter->second) {
+      if (!first)
+        stream << ",\n";
+
+      val->Print(stream, flag);
+
+      first = false;
+    }
+}
 
 void* 
 BasicModelBuilder::getRegistryObject(const char* partition, int tag) const
@@ -147,13 +162,13 @@ BasicModelBuilder::getRegistryObject(const char* partition, int tag) const
 
   auto iter = m_registry.find(std::string{partition});
   if (iter == m_registry.end()) {
-    opserr << "No partition named \"" << partition << "\"\n";
+    opserr << "No objects of type \"" << partition << "\" have been created.\n";
     return nullptr;
   }
 
   auto iter_objs = iter->second.find(tag) ;
   if (iter_objs == iter->second.end()) {
-    opserr << "No object with tag \"" << tag << " \"in partition \"" << partition << "\"\n";
+    opserr << "No object with tag \"" << tag << "\"in partition \"" << partition << "\"\n";
     return nullptr;
   }
 

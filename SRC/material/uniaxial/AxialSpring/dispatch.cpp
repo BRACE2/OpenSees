@@ -1,13 +1,12 @@
-#include <g3_api.h>
-#include <AxialSp.h>
-#include <AxialSpHD.h>
-#include <g3_api.h>
+#include "AxialSp.h"
+#include "AxialSpHD.h"
+#include <runtimeAPI.h>
+#include <BasicModelBuilder.h>
 
 int
 TclCommand_AxialSp(ClientData clientData, Tcl_Interp *interp, int argc,
                    TCL_Char ** const argv)
 {
-  G3_Runtime *rt = G3_getRuntime(interp);
   // arguments (necessary)
   int tag;
   double sce;
@@ -109,18 +108,13 @@ TclCommand_AxialSp(ClientData clientData, Tcl_Interp *interp, int argc,
   // Parsing was successful, allocate the material
   theMaterial = new AxialSp(tag, sce, fty, fcy, bte, bty, bcy, fcr);
 
-  if (theMaterial == 0) {
-    opserr << "WARNING could not create uniaxialMaterial " << argv[1] << endln;
-    return TCL_ERROR;
-  }
-
   // Now add the material to the modelBuilder
-  if (!G3_addUniaxialMaterial(rt,theMaterial)) {
-    opserr << "WARNING could not add uniaxialMaterial to the modelbuilder\n";
-    opserr << *theMaterial << endln;
-    delete theMaterial; // invoke the material objects destructor, otherwise mem
-                        // leak
+
+  BasicModelBuilder* builder = static_cast<BasicModelBuilder*>(clientData);
+  if (builder->addTaggedObject<UniaxialMaterial>(*theMaterial) != TCL_OK) {
+    delete theMaterial;
     return TCL_ERROR;
+
   } else {
     return TCL_OK;
   }
@@ -130,7 +124,6 @@ int
 TclCommand_AxialSpHD(ClientData clientData, Tcl_Interp *interp, int argc,
                      TCL_Char ** const argv)
 {
-  G3_Runtime *rt = G3_getRuntime(interp);
   // arguments (necessary)
   int tag;
   double sce;
@@ -251,18 +244,12 @@ TclCommand_AxialSpHD(ClientData clientData, Tcl_Interp *interp, int argc,
   // Parsing was successful, allocate the material
   theMaterial = new AxialSpHD(tag, sce, fty, fcy, bte, bty, bth, bcy, fcr, ath);
 
-  if (theMaterial == 0) {
-    opserr << "WARNING could not create uniaxialMaterial " << argv[1] << endln;
-    return TCL_ERROR;
-  }
-
   // Now add the material to the modelBuilder
-  if (!G3_addUniaxialMaterial(rt, theMaterial) ) {
-    opserr << "WARNING could not add uniaxialMaterial to the modelbuilder\n";
-    opserr << *theMaterial << endln;
-    delete theMaterial; // invoke the material objects destructor, otherwise mem
-                        // leak
+  BasicModelBuilder* builder = static_cast<BasicModelBuilder*>(clientData);
+  if (builder->addTaggedObject<UniaxialMaterial>(*theMaterial) != TCL_OK) {
+    delete theMaterial;
     return TCL_ERROR;
+
   } else {
     return TCL_OK;
   }

@@ -10,7 +10,9 @@
 cmake_minimum_required(VERSION 3.16)
 set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
 
-project(OpenSees C CXX Fortran)
+project(OpenSees 
+	DESCRIPTION "Open System For Earthquake Engineering Simulation"
+	LANGUAGES   C CXX Fortran)
 
 set(OPS_BUNDLED_DIR   "${CMAKE_CURRENT_LIST_DIR}/OTHER/")
 set(OPS_SRC_DIR       "${CMAKE_CURRENT_LIST_DIR}/SRC/")
@@ -21,9 +23,11 @@ include(OpenSeesFunctions)
 
 enable_testing()
 
-add_compile_definitions(OPS_USE_RUNTIME USE_TCL_STUBS _TCL85 _NOGRAPHICS) # _THREADS
+#==============================================================================
+# DEPENDENCIES
+#==============================================================================
 
-# add Conan stuff for external dependencies
+# If conan has been run, load generated external dependencies
 if(EXISTS "${CMAKE_BINARY_DIR}/conanbuildinfo.cmake")
    message(":: Using Conan")
 #  set(USE_CONAN TRUE)
@@ -33,6 +37,9 @@ if(EXISTS "${CMAKE_BINARY_DIR}/conanbuildinfo.cmake")
    set(TCL_INCLUDE_PATH "${CONAN_INCLUDE_DIRS_TCL}")
    set(TCL_LIBRARIES    "${CONAN_PKG_LIBS_TCL}")
 
+
+# Conan is the only supported dependency manager
+# on Windows; if Conan hasnt been run, run it.
 elseif(WIN32)
   list(APPEND CMAKE_MODULE_PATH ${CMAKE_BINARY_DIR})
   list(APPEND CMAKE_PREFIX_PATH ${CMAKE_BINARY_DIR})
@@ -56,6 +63,8 @@ elseif(WIN32)
                       REMOTE conancenter
                       SETTINGS ${settings})
 
+
+  # Load Conan build info
   if (EXISTS  "${CMAKE_BINARY_DIR}/src/libg3/conanbuildinfo.cmake")
     include(${CMAKE_BINARY_DIR}/src/libg3/conanbuildinfo.cmake)
   else()
@@ -77,18 +86,9 @@ elseif(WIN32)
   message("Win: Env:TCL_LIBRARY: $ENV{TCL_LIBRARY}")
   message("Win: TCL_INCL_PATH:   ${TCL_INCLUDE_PATH}")
   message("Win: TCL:             ${TCL_LIBRARIES}")
-# find_package(TCL)
 endif()
 
-# pseudo target modeling all exteral packages
-add_library(OPS_External_packages INTERFACE)
-
-# include user config
-# include(${CMAKE_CURRENT_LIST_DIR}/Conf.cmake)
-
-set(OPS_Extension_List
-  OPS_ASDEA
-)
+set(OPS_Extension_List OPS_ASDEA)
 
 #==============================================================================
 #                            OS Configuration
@@ -106,37 +106,37 @@ if (UNIX)
     message(":: MacOS")
     add_compile_definitions(_LINUX _UNIX _TCL85)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fmax-errors=1")
+    # Temporary fix for a bug that is currently in Xcode 15
+    add_link_options("-Wl,-ld_classic")
   else()
     message(":: LINUX")
     add_compile_definitions(_LINUX _UNIX USE_TCL_STUBS _TCL85)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fmax-errors=1 -ffloat-store")
     if (CMAKE_BUILD_TYPE EQUAL "DEBUG")
       add_compile_options(
+        $<$<CONFIG:DEBUG>:-ggdb>
         $<$<COMPILE_LANG_AND_ID:CXX,GNU>:-fsanitize=address,undefined> #, leak
         $<$<COMPILE_LANG_AND_ID:CXX,GNU>:-fno-omit-frame-pointer>
       )
       add_link_options(
-        -fsanitize=address,undefined> # , leak
+        "-fsanitize=address,undefined>" # , leak
       )
     elseif (CMAKE_BUILD_TYPE EQUAL "RELEASE")
       # Some x86_64 optimizations
       add_compile_options(
         $<$<CONFIG:RELEASE>:-march=haswell>
         $<$<CONFIG:RELEASE>:-msse4>
+        $<$<CONFIG:RELEASE>:-mtune=native>
         $<$<COMPILE_LANG_AND_ID:CXX,GNU>:-mavx2>
-#       $<$<COMPILE_LANG_AND_ID:CXX,GNU>:-ftree-vectorize>
       )
     endif()
   endif()
 
   # More general debug / optimization options
   add_compile_options(
-    $<$<CONFIG:DEBUG>:-ggdb>
     $<$<CONFIG:DEBUG>:-g3>
     $<$<CONFIG:DEBUG>:-Og>
-
     $<$<CONFIG:RELEASE>:-O3>
-    $<$<CONFIG:RELEASE>:-mtune=native>
   )
 
   if (DEFINED ProfileBuild)
@@ -145,7 +145,6 @@ if (UNIX)
   endif()
 
 elseif (WIN32) # NOTE: this will execute for both 32-bit and 64-bit builds.
-
   include(OpenSeesDependenciesWin)
   add_compile_definitions(_WIN32 _TCL85)
   add_compile_options(/favor:INTEL64)
@@ -177,7 +176,7 @@ enable_language(Fortran)
 #--------------------------------------
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-set(CMAKE_CXX_ARCHIVE_CREATE "<CMAKE_AR> cqls <TARGET> <LINK_FLAGS> <OBJECTS>")
+#set(CMAKE_CXX_ARCHIVE_CREATE "<CMAKE_AR> cqls <TARGET> <LINK_FLAGS> <OBJECTS>")
 
 # Compiler warnings
 add_compile_options(
@@ -186,9 +185,15 @@ add_compile_options(
   "$<$<COMPILE_LANG_AND_ID:CXX,AppleClang,Clang>:-Wno-reorder>"
   "$<$<COMPILE_LANG_AND_ID:CXX,GNU>:-Wno-reorder>"
   "$<$<COMPILE_LANG_AND_ID:Fortran,GNU>:-Wno-unused-dummy-argument>"
-  # $<$<AND:$<COMPILE_LANGUAGE:CXX>,$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wsign-conversion>
-  # $<$<AND:$<COMPILE_LANGUAGE:CXX>,$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wconversion>
 )
+
+# Global compiler definitions
+add_compile_definitions(
+    "$<$<COMPILE_LANGUAGE:C,CXX>: OPS_USE_RUNTIME>"
+    "$<$<COMPILE_LANGUAGE:C,CXX>: USE_TCL_STUBS>"
+    "$<$<COMPILE_LANGUAGE:C,CXX>: _TCL85>"
+    "$<$<COMPILE_LANGUAGE:C,CXX>: _NOGRAPHICS>"
+) # _THREADS
 
 #----------------------------------------------------------------
 # Global Includes
@@ -303,6 +308,7 @@ include_directories(${TCL_INCLUDE_PATH})
 message("\n:: OpenSees Summary")
 message("  :: BLAS:      ${BLAS_LIBRARIES}")
 message("  :: LAPACK:    ${LAPACK_LIBRARIES}")
+message("  :: Eigen:     ${Eigen_INCLUDE_DIRS}")
 message("  :: SUPERLU:   ${SUPERLU_LIBRARIES}")
 message("  :: ARPACK:    ${ARPACK_LIBRARIES}")
 message("  :: UMFPACK:   ${UMFPACK_LIBRARIES}")
@@ -366,9 +372,6 @@ endif()
 set_property(TARGET G3                    PROPERTY POSITION_INDEPENDENT_CODE 1)
 
 
-# Executables and final targets
-#------------------------------------------------------------------------------
-# Adding EXCLUDE_FROM_ALL prevents these from being made by default.
 
 
 # Add sources to targets

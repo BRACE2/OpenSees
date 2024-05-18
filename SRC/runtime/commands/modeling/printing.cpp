@@ -30,6 +30,10 @@
 #include <MP_Constraint.h>
 #include <MP_ConstraintIter.h>
 
+#include <UniaxialMaterial.h>
+#include <NDMaterial.h>
+#include <SectionForceDeformation.h>
+
 #include <Pressure_Constraint.h>
 #include <Element.h>
 #include <ElementIter.h>
@@ -56,6 +60,7 @@ printRegistry(BasicModelBuilder* builder, TCL_Char* type, int flag, OPS_Stream *
   return TCL_OK;
 }
 
+
 static void
 printDomain(OPS_Stream &s, BasicModelBuilder* builder, int flag) 
 {
@@ -71,17 +76,18 @@ printDomain(OPS_Stream &s, BasicModelBuilder* builder, int flag)
     s << tab << "\"properties\": {\n";
     //
     s << tab << tab << "\"sections\": [\n";        
-    printRegistry(builder, "CrossSection", flag, &s);
+    builder->printRegistry<SectionForceDeformation>(s, flag);
     s << "\n" << tab << tab << "]";
     s << ",\n";
     //
     s << tab << tab << "\"nDMaterials\": [\n";        
+    builder->printRegistry<NDMaterial>(s, flag);
     printRegistry(builder, "NDMaterial", flag, &s);
     s << "\n" << tab << tab << "]";
     s << ",\n";
     //
     s << tab << tab << "\"uniaxialMaterials\": [\n";        
-    printRegistry(builder, "UniaxialMaterial", flag, &s);
+    builder->printRegistry<UniaxialMaterial>(s, flag);
     s << "\n" << tab << tab << "]";
     s << ",\n";
     //
@@ -343,7 +349,7 @@ printElement(ClientData clientData, Tcl_Interp *interp, int argc,
     // otherwise print out the specified elements i j k .. with flag
     int numEle = argc - eleArg;
     ID *theEle = new ID(numEle);
-    for (int i = 0; i < numEle; i++) {
+    for (int i = 0; i < numEle; ++i) {
       int eleTag;
       if (Tcl_GetInt(interp, argv[i + eleArg], &eleTag) != TCL_OK) {
         opserr << G3_ERROR_PROMPT << "print -ele failed to get integer: " << argv[i]
@@ -414,7 +420,7 @@ printNode(ClientData clientData, Tcl_Interp *interp, int argc, TCL_Char ** const
     // otherwise print out the specified nodes i j k .. with flag
     int numNodes = argc - nodeArg;
     ID *theNodes = new ID(numNodes);
-    for (int i = 0; i < numNodes; i++) {
+    for (int i = 0; i < numNodes; ++i) {
       int nodeTag;
       if (Tcl_GetInt(interp, argv[nodeArg], &nodeTag) != TCL_OK) {
         opserr << G3_ERROR_PROMPT << "print node failed to get integer: " << argv[nodeArg]
@@ -571,11 +577,11 @@ printModelGID(ClientData clientData, Tcl_Interp *interp, int argc,
           Node **NodePtrs;
           NodePtrs = theElement->getNodePtrs();
           ID tagNodes(nNode);
-          for (int i = 0; i < nNode; i++) {
+          for (int i = 0; i < nNode; ++i) {
             tagNodes(i) = NodePtrs[i]->getTag();
           }
           outputFile << tag << "\t\t";
-          for (int i = 0; i < nNode; i++) {
+          for (int i = 0; i < nNode; ++i) {
             outputFile << tagNodes(i) << "\t";
           }
           outputFile << endln;
@@ -630,11 +636,11 @@ printModelGID(ClientData clientData, Tcl_Interp *interp, int argc,
           Node **NodePtrs;
           NodePtrs = theElement->getNodePtrs();
           ID tagNodes(nNode);
-          for (int i = 0; i < nNode; i++) {
+          for (int i = 0; i < nNode; ++i) {
             tagNodes(i) = NodePtrs[i]->getTag();
           }
           outputFile << tag << "\t\t";
-          for (int i = 0; i < nNode; i++) {
+          for (int i = 0; i < nNode; ++i) {
             outputFile << tagNodes(i) << "\t";
           }
           outputFile << endln;
@@ -689,11 +695,11 @@ printModelGID(ClientData clientData, Tcl_Interp *interp, int argc,
           Node **NodePtrs;
           NodePtrs = theElement->getNodePtrs();
           ID tagNodes(nNode);
-          for (int i = 0; i < nNode; i++) {
+          for (int i = 0; i < nNode; ++i) {
             tagNodes(i) = NodePtrs[i]->getTag();
           }
           outputFile << tag << "\t\t";
-          for (int i = 0; i < nNode; i++) {
+          for (int i = 0; i < nNode; ++i) {
             outputFile << tagNodes(i) << "\t";
           }
           outputFile << endln;
@@ -747,11 +753,11 @@ printModelGID(ClientData clientData, Tcl_Interp *interp, int argc,
           Node **NodePtrs;
           NodePtrs = theElement->getNodePtrs();
           ID tagNodes(nNode);
-          for (int i = 0; i < nNode; i++) {
+          for (int i = 0; i < nNode; ++i) {
             tagNodes(i) = NodePtrs[i]->getTag();
           }
           outputFile << tag << "\t\t";
-          for (int i = 0; i < nNode; i++) {
+          for (int i = 0; i < nNode; ++i) {
             outputFile << tagNodes(i) << "\t";
           }
           outputFile << endln;
@@ -807,11 +813,11 @@ printModelGID(ClientData clientData, Tcl_Interp *interp, int argc,
           Node **NodePtrs;
           NodePtrs = theElement->getNodePtrs();
           ID tagNodes(nNode);
-          for (int i = 0; i < nNode; i++) {
+          for (int i = 0; i < nNode; ++i) {
             tagNodes(i) = NodePtrs[i]->getTag();
           }
           outputFile << tag << "\t\t";
-          for (int i = 0; i < nNode; i++) {
+          for (int i = 0; i < nNode; ++i) {
             outputFile << tagNodes(i) << "\t";
           }
           outputFile << endln;

@@ -141,17 +141,19 @@ std::unordered_map<std::string, G3_TclUniaxialPackage *> tcl_uniaxial_package_ta
 typedef UniaxialMaterial* (TclDispatch_UniaxialMaterial)(G3_Runtime*, int, TCL_Char ** const);
 TclDispatch_UniaxialMaterial G3Parse_newFedeasUniaxialDamage;
 TclDispatch_UniaxialMaterial TclCommand_ReinforcingSteel;
-TclDispatch_UniaxialMaterial G3Parse_newParallelMaterial;
-// TclDispatch_UniaxialMaterial TclCommand_AxialSp;
-// TclDispatch_UniaxialMaterial TclCommand_AxialSpHD;
-static Tcl_CmdProc TclCommand_newFatigueMaterial;
 
+static Tcl_CmdProc TclCommand_newFatigueMaterial;
+static Tcl_CmdProc TclCommand_newUniaxialJ2Plasticity;
+
+Tcl_CmdProc TclCommand_AxialSp;
+Tcl_CmdProc TclCommand_AxialSpHD;
 Tcl_CmdProc TclCommand_KikuchiAikenHDR;
 Tcl_CmdProc TclCommand_KikuchiAikenLRB;
 Tcl_CmdProc TclCommand_newUniaxialConcrete04;
 Tcl_CmdProc TclCommand_newUniaxialConcrete06;
 Tcl_CmdProc TclCommand_newUniaxialConcrete07;
 Tcl_CmdProc TclCommand_newUniaxialBoucWen;
+Tcl_CmdProc TclCommand_newParallelMaterial;
 
 // typedef int (TclCommand_UniaxialMaterial)(ClientData, Tcl_Interp*, int, TCL_Char ** const);
 static Tcl_CmdProc TclDispatch_newUniaxialPinching4;
@@ -217,10 +219,10 @@ std::unordered_map<std::string, Tcl_CmdProc*> uniaxial_dispatch {
     {"FedeasUniaxialDamage", dispatch<G3Parse_newFedeasUniaxialDamage>  },
     {"KikuchiAikenHDR",      dispatch<TclCommand_KikuchiAikenHDR>       },
     {"KikuchiAikenLRB",      dispatch<TclCommand_KikuchiAikenLRB>       },
-    /*
-    {"AxialSp",              TclCommand_AxialSp               },
-    {"AxialSpHD",            TclCommand_AxialSpHD             },
-    */
+
+    {"AxialSp",              dispatch<TclCommand_AxialSp>               },
+    {"AxialSpHD",            dispatch<TclCommand_AxialSpHD>             },
+
     {"Concrete04",           dispatch<TclCommand_newUniaxialConcrete04> },
     {"Concrete06",           dispatch<TclCommand_newUniaxialConcrete06> },
     {"Concrete07",           dispatch<TclCommand_newUniaxialConcrete07> },
@@ -228,9 +230,9 @@ std::unordered_map<std::string, Tcl_CmdProc*> uniaxial_dispatch {
     { "ConcretewBeta",       dispatch<OPS_ConcretewBeta>    }
 #endif
 //  {"ReinforcingSteel",     dispatch<TclCommand_ReinforcingSteel>   }, 
-    {"ReinforcingSteel",     dispatch< OPS_ReinforcingSteel>         },
-    {"Parallel",             dispatch<G3Parse_newParallelMaterial>   },
-    {"BoucWen",              dispatch<TclCommand_newUniaxialBoucWen> },
+    {"ReinforcingSteel",     dispatch< OPS_ReinforcingSteel>           },
+    {"Parallel",             dispatch<TclCommand_newParallelMaterial>  },
+    {"BoucWen",              dispatch<TclCommand_newUniaxialBoucWen>   },
 
     {"Elastic",                dispatch<OPS_ElasticMaterial>           },
 
@@ -413,6 +415,7 @@ std::unordered_map<std::string, Tcl_CmdProc*> uniaxial_dispatch {
     {"Masonryt",               dispatch<OPS_Masonryt>                  },
 
     {"ElasticPP",              dispatch<OPS_ElasticPPMaterial>         },
+    {"UniaxialJ2Plasticity",    dispatch<TclCommand_newUniaxialJ2Plasticity> },
 
     {"Hardening",              dispatch<OPS_HardeningMaterial>         },
     {"Hardening2",             dispatch<OPS_HardeningMaterial>         },
