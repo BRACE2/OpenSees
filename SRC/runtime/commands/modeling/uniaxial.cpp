@@ -1,7 +1,8 @@
-/* ****************************************************************** **
-**    OpenSees - Open System for Earthquake Engineering Simulation    **
-**          Pacific Earthquake Engineering Research Center            **
-** ****************************************************************** */
+//===----------------------------------------------------------------------===//
+//
+//        OpenSees - Open System for Earthquake Engineering Simulation
+//
+//===----------------------------------------------------------------------===//
 //
 // Description: This file contains the function invoked when the user invokes
 // the uniaxialMaterial command in the interpreter.
@@ -12,7 +13,7 @@
 
 #include <G3_Logging.h>
 #include <iostream>
-#include <runtime/BasicModelBuilder.h>
+#include <BasicModelBuilder.h>
 #include "uniaxial.hpp"
 #include <packages.h>
 
@@ -114,9 +115,9 @@ TclCommand_addUniaxialMaterial(ClientData clientData, Tcl_Interp *interp,
   UniaxialMaterial *theMaterial = nullptr;
 
   auto tcl_cmd = uniaxial_dispatch.find(std::string(argv[1]));
-  if (tcl_cmd != uniaxial_dispatch.end()) {
+  if (tcl_cmd != uniaxial_dispatch.end())
     return (*tcl_cmd->second)(clientData, interp, argc, &argv[0]);
-  }
+
 
   if (theMaterial == nullptr) {
     char *mat_name;

@@ -1,7 +1,6 @@
 /* ****************************************************************** **
 **    Opensee - Open System for Earthquake Engineering Simulation    **
 **          Pacific Earthquake Engineering Research Center            **
-**                                                                    **
 ** ****************************************************************** */
 //
 // Description: This file contains the function invoked when the user invokes
@@ -11,10 +10,11 @@
 // Created: 07/99
 //
 //
-#include <runtime/BasicModelBuilder.h>
-#include <unordered_map> // std::unordered_map
+#include <unordered_map>
+#include <tcl.h>
 #include <runtimeAPI.h>
 #include <elementAPI.h>
+#include <BasicModelBuilder.h>
 #include <Elastic2Material.h>   // ZHY
 #include <HardeningMaterial.h>  // MHS
 #include <HardeningMaterial2.h> // MHS
@@ -81,7 +81,6 @@ extern OPS_Routine OPS_FRPConfinedConcrete;
 extern OPS_Routine OPS_FRPConfinedConcrete02;
 extern OPS_Routine OPS_UVCuniaxial;
 extern OPS_Routine OPS_Steel01Thermal;
-extern OPS_Routine OPS_Steel02Thermal;
 extern OPS_Routine OPS_Concrete02Thermal;
 extern OPS_Routine OPS_StainlessECThermal;     // L.Jiang [SIF]
 extern OPS_Routine OPS_SteelECThermal;         // L.Jiang [SIF]

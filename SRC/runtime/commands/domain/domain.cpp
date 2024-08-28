@@ -1,7 +1,8 @@
-/* ****************************************************************** **
-**    OpenSees - Open System for Earthquake Engineering Simulation    **
-**          Pacific Earthquake Engineering Research Center            **
-** ****************************************************************** */
+//===----------------------------------------------------------------------===//
+//
+//        OpenSees - Open System for Earthquake Engineering Simulation
+//
+//===----------------------------------------------------------------------===//
 //
 // Description: Domain manipulation commands which do not require
 // additional namespacing.
@@ -69,7 +70,7 @@ removeObject(ClientData clientData, Tcl_Interp *interp, int argc,
 
     if (Tcl_GetIntFromObj(interp, objv[2], &tag) != TCL_OK) {
       opserr << "WARNING remove element tag? failed to read tag: " 
-             << Tcl_GetString(objv[2]) << endln;
+             << Tcl_GetString(objv[2]) << "\n";
       return TCL_ERROR;
     }
     Element *theEle = the_domain->removeElement(tag);
@@ -113,7 +114,7 @@ removeObject(ClientData clientData, Tcl_Interp *interp, int argc,
     }
     if (Tcl_GetIntFromObj(interp, objv[2], &tag) != TCL_OK) {
       opserr << "WARNING remove loadPattern tag? failed to read tag: "
-             << Tcl_GetString(objv[2]) << endln;
+             << Tcl_GetString(objv[2]) << "\n";
       return TCL_ERROR;
     }
     LoadPattern *thePattern = the_domain->removeLoadPattern(tag);
@@ -131,7 +132,7 @@ removeObject(ClientData clientData, Tcl_Interp *interp, int argc,
     }
     if (Tcl_GetIntFromObj(interp, objv[2], &tag) != TCL_OK) {
       opserr << "WARNING remove loadPattern tag? failed to read tag: "
-             << Tcl_GetString(objv[2]) << endln;
+             << Tcl_GetString(objv[2]) << "\n";
       return TCL_ERROR;
     }
     bool ok = OPS_removeTimeSeries(tag);
@@ -148,7 +149,7 @@ removeObject(ClientData clientData, Tcl_Interp *interp, int argc,
     }
     if (Tcl_GetIntFromObj(interp, objv[2], &tag) != TCL_OK) {
       opserr << "WARNING remove parameter tag? failed to read tag: " << Tcl_GetString(objv[2])
-             << endln;
+             << "\n";
       return TCL_ERROR;
     }
     Parameter *theParameter = the_domain->removeParameter(tag);
@@ -164,7 +165,7 @@ removeObject(ClientData clientData, Tcl_Interp *interp, int argc,
     }
     if (Tcl_GetIntFromObj(interp, objv[2], &tag) != TCL_OK) {
       opserr << "WARNING remove node tag? failed to read tag: " 
-             << Tcl_GetString(objv[2]) << endln;
+             << Tcl_GetString(objv[2]) << "\n";
       return TCL_ERROR;
     }
     Node *theNode = the_domain->removeNode(tag);
@@ -190,7 +191,7 @@ removeObject(ClientData clientData, Tcl_Interp *interp, int argc,
     if (Tcl_GetIntFromObj(interp, objv[2], &tag) != TCL_OK) {
         opserr << G3_ERROR_PROMPT 
                << "remove recorder tag? failed to read tag: " << Tcl_GetString(objv[2])
-               << endln;
+               << "\n";
       return TCL_ERROR;
     }
     if (the_domain->removeRecorder(tag) != 0) {
@@ -240,7 +241,7 @@ removeObject(ClientData clientData, Tcl_Interp *interp, int argc,
     if (argc == 3) {
       if (Tcl_GetIntFromObj(interp, objv[2], &nodTag) != TCL_OK) {
         opserr << "WARNING remove mp nodeTag? failed to read nodeTag: "
-               << Tcl_GetString(objv[2]) << endln;
+               << Tcl_GetString(objv[2]) << "\n";
         return TCL_ERROR;
       }
 
@@ -250,7 +251,7 @@ removeObject(ClientData clientData, Tcl_Interp *interp, int argc,
     if (strcmp(Tcl_GetString(objv[2]), "-tag") == 0 && argc > 3) {
       if (Tcl_GetIntFromObj(interp, objv[3], &nodTag) != TCL_OK) {
         opserr << "WARNING remove mp -tag mpTag? failed to read mpTag: "
-               << Tcl_GetString(objv[3]) << endln;
+               << Tcl_GetString(objv[3]) << "\n";
         return TCL_ERROR;
       }
 
@@ -300,7 +301,7 @@ removeObject(ClientData clientData, Tcl_Interp *interp, int argc,
 
   else
     opserr << "WARNING remove " 
-           << Tcl_GetString(objv[1]) << " not supported" << endln;
+           << Tcl_GetString(objv[1]) << " not supported" << "\n";
 
   return TCL_OK;
 }
@@ -497,5 +498,101 @@ constrainedDOFs(ClientData clientData, Tcl_Interp *interp, int argc,
     }
   }
   return TCL_OK;
+}
+
+int
+retainedDOFs(ClientData clientData, Tcl_Interp *interp, int argc,
+             TCL_Char ** const argv)
+{
+  assert(clientData != nullptr);
+  Domain *domain = (Domain*)clientData;
+
+  if (argc < 2) {
+    opserr << G3_ERROR_PROMPT << "want - retainedDOFs rNode? <cNode?> <cDOF?>\n";
+    return TCL_ERROR;
+  }
+
+  int rNode;
+  if (Tcl_GetInt(interp, argv[1], &rNode) != TCL_OK) {
+    opserr << G3_ERROR_PROMPT << "retainedDOFs rNode? <cNode?> <cDOF?> - could not read "
+              "rNode? \n";
+    return TCL_ERROR;
+  }
+
+  int cNode;
+  bool allNodes = 1;
+  if (argc > 2) {
+    if (Tcl_GetInt(interp, argv[2], &cNode) != TCL_OK) {
+      opserr << G3_ERROR_PROMPT << "retainedDOFs rNode? <cNode?> <cDOF?> - could not read "
+                "cNode? \n";
+      return TCL_ERROR;
+    }
+    allNodes = 0;
+  }
+
+  int cDOF;
+  bool allDOFs = 1;
+  if (argc > 3) {
+    if (Tcl_GetInt(interp, argv[3], &cDOF) != TCL_OK) {
+      opserr << G3_ERROR_PROMPT << "retainedDOFs rNode? <cNode?> <cDOF?> - could not read "
+                "cDOF? \n";
+      return TCL_ERROR;
+    }
+    cDOF--;
+    allDOFs = 0;
+  }
+
+  MP_Constraint *theMP;
+  MP_ConstraintIter &mpIter = domain->getMPs();
+
+  int tag;
+  int i;
+  int n;
+  Vector retained(6);
+  while ((theMP = mpIter()) != nullptr) {
+    tag = theMP->getNodeRetained();
+    if (tag == rNode) {
+      if (allNodes || cNode == theMP->getNodeConstrained()) {
+        const ID &rDOFs = theMP->getRetainedDOFs();
+        n = rDOFs.Size();
+        if (allDOFs) {
+          for (i = 0; i < n; ++i) {
+            retained(rDOFs(i)) = 1;
+          }
+        } else {
+          const ID &cDOFs = theMP->getConstrainedDOFs();
+          for (int i = 0; i < n; ++i) {
+            if (cDOF == cDOFs(i))
+              retained(rDOFs(i)) = 1;
+          }
+        }
+      }
+    }
+  }
+  char buffer[20];
+  for (int i = 0; i < 6; ++i) {
+    if (retained(i) == 1) {
+      sprintf(buffer, "%d ", i + 1);
+      Tcl_AppendResult(interp, buffer, NULL);
+    }
+  }
+
+  return TCL_OK;
+}
+
+int
+updateElementDomain(ClientData clientData, Tcl_Interp *interp, int argc,
+                    TCL_Char ** const argv)
+{
+  // Need to "setDomain" to make the change take effect.
+  assert(clientData != nullptr);
+  Domain *domain = (Domain*)clientData;
+
+  ElementIter &theElements = domain->getElements();
+  Element *theElement;
+  while ((theElement = theElements()) != nullptr)
+    theElement->setDomain(domain);
+
+  return 0;
 }
 

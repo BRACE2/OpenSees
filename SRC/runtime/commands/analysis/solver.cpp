@@ -1,7 +1,8 @@
-/* ****************************************************************** **
-**    OpenSees - Open System for Earthquake Engineering Simulation    **
-**          Pacific Earthquake Engineering Research Center            **
-** ****************************************************************** */
+//===----------------------------------------------------------------------===//
+//
+//        OpenSees - Open System for Earthquake Engineering Simulation
+//
+//===----------------------------------------------------------------------===//
 //
 // Description: This file implements commands that configure the linear
 // solver.
@@ -22,7 +23,7 @@
 // #include "analysis.h"
 #include <OPS_Globals.h>
 #include "solver.hpp"
-#include "runtime/BasicAnalysisBuilder.h"
+#include "BasicAnalysisBuilder.h"
 
 // analysis
 #include <StaticAnalysis.h>

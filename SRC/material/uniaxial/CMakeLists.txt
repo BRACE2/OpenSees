@@ -9,6 +9,9 @@ target_include_directories(OPS_Material PUBLIC ${CMAKE_CURRENT_LIST_DIR})
 
 target_sources(OPS_Material
   PRIVATE
+    APDFMD.cpp
+    APDMD.cpp
+    APDVFD.cpp
     BWBN.cpp
     Bilin.cpp
     Bilin02.cpp
@@ -27,12 +30,15 @@ target_sources(OPS_Material
     HystereticSmooth.cpp
     HystereticAsym.cpp
     MaterialState.cpp
-    OriginCentered.cpp
+    MultiplierMaterial.cpp
     ParallelMaterial.cpp
     ResilienceLow.cpp
+    Ratchet.cpp
     UVCuniaxial.cpp
     UniaxialMaterial.cpp
   PUBLIC
+    APDMD.h
+    APDVFD.h
     BWBN.h
     Bilin.h
     Bilin02.h
@@ -51,9 +57,10 @@ target_sources(OPS_Material
     HystereticSmooth.h
     HystereticAsym.h
     MaterialState.h
-    OriginCentered.h
+    MultiplierMaterial.h
     ParallelMaterial.h
     ResilienceLow.h
+    Ratchet.h
     UVCuniaxial.h
     UniaxialMaterial.h
 )
@@ -71,7 +78,6 @@ target_sources(OPS_Material
       CFSWSWP.cpp
       CableMaterial.cpp
       Cast.cpp
-      ContinuumUniaxial.cpp
       CubicSpline.cpp
       DamperMaterial.cpp
       DegradingPinchedBW.cpp
@@ -104,7 +110,6 @@ target_sources(OPS_Material
       OOHystereticMaterial.cpp
       PathIndependentMaterial.cpp
       Pinching4Material.cpp
-      ReinforcingSteel.cpp
       ResilienceMaterialHR.cpp
       SAWSMaterial.cpp
       SPSW02.cpp
@@ -135,20 +140,12 @@ target_sources(OPS_Material
       CFSWSWP.h
       CableMaterial.h
       Cast.h
-#     Concrete01.h
-#     Concrete01WithSITC.h
-#     Concrete02.h
 #     Concrete02IS.h
 #     Concrete02Thermal.h
-#     Concrete04.h
-#     Concrete05.h
-#     Concrete06.h
-#     Concrete07.h
 #     ConcreteECThermal.h
 #     ConcreteSakaiKawashima.h
 #     ConcretewBeta.h
 #     ConfinedConcrete01.h
-      ContinuumUniaxial.h
       CubicSpline.h
       DamperMaterial.h
       DegradingPinchedBW.h
@@ -186,7 +183,6 @@ target_sources(OPS_Material
       PathIndependentMaterial.h
       Pinching4Material.h
 
-      ReinforcingSteel.h
       ResilienceMaterialHR.h
       SAWSMaterial.h
       SPSW02.h
@@ -249,6 +245,7 @@ add_library(OPS_Material_f)
 if ("${CMAKE_Fortran_COMPILER_ID}" MATCHES "GNU")
   target_compile_options(OPS_Material_f PRIVATE "-w" "-std=legacy")
 endif()
+
 # target_sources(OPS_Material_f PRIVATE
 #      #DoddRestrepo.f
 #      #STEELDR.f
@@ -259,17 +256,21 @@ target_link_libraries(OPS_Material PUBLIC OPS_Material_f)
 
 add_subdirectory(BoucWen)
 add_subdirectory(AxialSpring)
+add_subdirectory(AlgebraicHysteresis)
 add_subdirectory(backbone)
 add_subdirectory(bearing)
 add_subdirectory(stiffness)
 add_subdirectory(strength)
 add_subdirectory(unloading)
 add_subdirectory(limitState)
+add_subdirectory(Parallel)
 add_subdirectory(concrete)
 add_subdirectory(steel)
 
 add_subdirectory(PY)
 add_subdirectory(snap)
 add_subdirectory(fedeas)
+add_subdirectory(wrapper)
 add_subdirectory(drain)
+add_subdirectory(legacy)
 

@@ -1,13 +1,10 @@
-/* ****************************************************************** **
-**    OpenSees - Open System for Earthquake Engineering Simulation    **
-**          Pacific Earthquake Engineering Research Center            **
-** ****************************************************************** */
+//===----------------------------------------------------------------------===//
 //
-// Description: This file contains the implementation of the TclElementCommands.
-// The file contains the routine TclElementCommands which is invoked by the
-// TclBasicBuilder.
+//        OpenSees - Open System for Earthquake Engineering Simulation    
 //
-// cmp
+//===----------------------------------------------------------------------===//
+//
+// Written: cmp
 //
 #include <tcl.h>
 #include "element.hpp"
@@ -23,7 +20,7 @@
 #define strcmp strcasecmp
 
 #include <runtimeAPI.h>
-#include <runtime/BasicModelBuilder.h>
+#include <BasicModelBuilder.h>
 
 #include <OPS_Stream.h>
 #include <G3_Logging.h>
@@ -33,7 +30,6 @@
 #include <CrdTransf.h>
 #include <NDMaterial.h>
 
-class TclBasicBuilder;
 
 #include <UniaxialMaterial.h>
 #include <MultipleShearSpring.h>
@@ -62,23 +58,19 @@ extern "C" int OPS_ResetInputNoBuilder(ClientData clientData, Tcl_Interp *interp
 extern int TclBasicBuilder_addFeapTruss(ClientData clientData, Tcl_Interp *interp, int argc, TCL_Char ** const argv, Domain *, TclBasicBuilder *, int argStart);
 extern int Tcl_addWrapperElement(eleObj *, ClientData clientData, Tcl_Interp *interp, int argc, TCL_Char ** const argv, Domain *, TclBuilder *);
 // Added by Quan Gu and Yongdou Liu, et al. on 2018/10/31 (Xiamen University)
-int TclBasicBuilder_addWheelRail(ClientData, Tcl_Interp *, int, TCL_Char **, Domain *, TclBasicBuilder *, int);
 #endif
+static Tcl_CmdProc TclBasicBuilder_addWheelRail;
 
 
 
+extern OPS_Routine OPS_ElasticBeam3d;
 extern void *OPS_ElasticBeam2d(G3_Runtime *, const ID &);
 
-typedef int (G3_TclElementCommand)(ClientData, Tcl_Interp*, int, const char** const, Domain*, TclBasicBuilder*);
 
-Tcl_CmdProc TclCommand_addFlatSliderBearing;
-// extern OPS_Routine OPS_FlatSliderSimple2d;
-// extern OPS_Routine OPS_FlatSliderSimple3d;
-
-Tcl_CmdProc TclCommand_addSingleFPBearing;
-// extern OPS_Routine OPS_SingleFPSimple2d;
-// extern OPS_Routine OPS_SingleFPSimple3d;
-
+// Frame
+Tcl_CmdProc TclBasicBuilder_addElasticBeam;
+Tcl_CmdProc TclBasicBuilder_addGradientInelasticBeamColumn;
+Tcl_CmdProc TclBasicBuilder_addForceBeamColumn;
 
 // Zero-length
 Tcl_CmdProc TclCommand_addZeroLength;
@@ -88,31 +80,36 @@ Tcl_CmdProc TclCommand_addZeroLengthContact3D;
 Tcl_CmdProc TclCommand_addZeroLengthRocking;
 Tcl_CmdProc TclCommand_addZeroLengthND;
 
-G3_TclElementCommand TclBasicBuilder_addBeamWithHinges;
-G3_TclElementCommand TclBasicBuilder_addDispBeamColumnInt;
+Tcl_CmdProc TclBasicBuilder_addBeamWithHinges;
+Tcl_CmdProc TclBasicBuilder_addDispBeamColumnInt;
 
+// Joint
+Tcl_CmdProc TclBasicBuilder_addJoint2D;
+Tcl_CmdProc TclBasicBuilder_addJoint3D;
+Tcl_CmdProc TclBasicBuilder_addBeamColumnJoint;
 
 // Other
-extern int TclBasicBuilder_addJoint2D(ClientData, Tcl_Interp *, int, TCL_Char **const, Domain *);
-G3_TclElementCommand TclBasicBuilder_addJoint3D;
-G3_TclElementCommand TclBasicBuilder_addElastic2dGNL;
-G3_TclElementCommand TclBasicBuilder_addElement2dYS;
+Tcl_CmdProc TclBasicBuilder_addElement2dYS;
+Tcl_CmdProc TclBasicBuilder_addElastic2dGNL;
+Tcl_CmdProc TclBasicBuilder_addKikuchiBearing;
+
+
+Tcl_CmdProc TclBasicBuilder_addGenericCopy;
+Tcl_CmdProc TclBasicBuilder_addGenericClient;
+
+Tcl_CmdProc TclCommand_addFlatSliderBearing;
+Tcl_CmdProc TclCommand_addSingleFPBearing;
+
+class TclBasicBuilder;
+typedef int (G3_TclElementCommand)(ClientData, Tcl_Interp*, int, const char** const, Domain*, TclBasicBuilder*);
 G3_TclElementCommand TclBasicBuilder_addMultipleShearSpring;
 G3_TclElementCommand TclBasicBuilder_addMultipleNormalSpring;
-Tcl_CmdProc          TclBasicBuilder_addKikuchiBearing;
 G3_TclElementCommand TclBasicBuilder_addYamamotoBiaxialHDR;
 G3_TclElementCommand TclBasicBuilder_addMasonPan12;
 G3_TclElementCommand TclBasicBuilder_addMasonPan3D;
 G3_TclElementCommand TclBasicBuilder_addBeamGT;
 
-int TclBasicBuilder_addBeamColumnJoint(ClientData, Tcl_Interp *, int, TCL_Char **const, Domain *, int);
 
-Tcl_CmdProc TclBasicBuilder_addGradientInelasticBeamColumn;
-
-Tcl_CmdProc TclBasicBuilder_addForceBeamColumn;
-
-Tcl_CmdProc TclBasicBuilder_addGenericCopy;
-Tcl_CmdProc TclBasicBuilder_addGenericClient;
 
 
 // Shells
@@ -127,7 +124,6 @@ Element* TclDispatch_newShellNLDKGQ(ClientData, Tcl_Interp*, int, TCL_Char** con
 Element* TclDispatch_newShellNLDKGQThermal(ClientData, Tcl_Interp*, int, TCL_Char** const);
 Element* TclDispatch_newShellNLDKGT(ClientData, Tcl_Interp*, int, TCL_Char** const);
 
-Element* TclDispatch_newTri31(ClientData clientData, Tcl_Interp *interp, int argc, TCL_Char ** const argv);
 
 
 int
@@ -173,15 +169,13 @@ TclCommand_addElement(ClientData clientData, Tcl_Interp *interp, int argc, TCL_C
   }
 
   else if ((strcasecmp(argv[1], "elasticBeamColumn") == 0) ||
-           (strcasecmp(argv[1], "elasticBeam")) == 0) {
+           (strcasecmp(argv[1], "elasticBeam") == 0)  ||
+           (strcasecmp(argv[1], "PrismFrame") == 0)) {
 
-    ID info;
-    if (ndm == 2)
-      theEle = OPS_ElasticBeam2d(rt, info);
-    else
-      theEle = OPS_ElasticBeam3d(rt, argc, argv);
+    return TclBasicBuilder_addElasticBeam(clientData, interp, argc, argv);
+  }
 
-  } else if (strcasecmp(argv[1], "PML") == 0) {
+  else if (strcasecmp(argv[1], "PML") == 0) {
     if (ndm == 2)
       theEle = OPS_PML2D(rt, argc, argv);
     else
@@ -308,15 +302,6 @@ TclCommand_addElement(ClientData clientData, Tcl_Interp *interp, int argc, TCL_C
 //    theEle = OPS_SingleFPSimple3d(rt, argc, argv);
   }
 
-  else if (strcmp(argv[1], "RJWatsonEqsBearing") == 0 ||
-           strcmp(argv[1], "RJWatsonBearing") == 0 ||
-           strcmp(argv[1], "EQSBearing") == 0) {
-    if (ndm == 2)
-      theEle = OPS_RJWatsonEQS2d(rt, argc, argv);
-    else
-      theEle = OPS_RJWatsonEQS3d(rt, argc, argv);
-  }
-
   // Xinlong Du
   else if ((strcmp(argv[1], "DispBeamColumnAsym") == 0) ||
            (strcmp(argv[1], "DispBeamAsym")) == 0) {
@@ -378,13 +363,6 @@ TclCommand_addElement(ClientData clientData, Tcl_Interp *interp, int argc, TCL_C
     theEle = TclDispatch_newShellANDeS(clientData, interp, argc, argv);
   }
 
-  else if (strcmp(argv[1], "Tri31") == 0) {
-    // ID info;
-    // theEle = OPS_Tri31(info);
-    theEle = TclDispatch_newTri31(clientData, interp, argc, argv);
-  }
-
-
 
   // if one of the above worked
   theElement = (Element*)theEle;
@@ -411,45 +389,43 @@ TclCommand_addElement(ClientData clientData, Tcl_Interp *interp, int argc, TCL_C
   }
 #endif // _OPS_Element_FEAP
 
-#if 0
-    // Beginning of WheelRail element TCL command
-    // Added by Quan Gu and Yongdou Liu, et al. on 2018/10/31
-
-  } else if ((strcmp(argv[1], "WheelRail") == 0)) {
-    // ------------------------------add------------------------------------------
-    int eleArgStart = 1;
-    int result = TclBasicBuilder_addWheelRail(
-        clientData, interp, argc, argv, theTclDomain, theTclBuilder, eleArgStart);
-#endif
-
   //
   // Beams
   //
-  else if (strcmp(argv[1], "dispBeamColumnInt") == 0) {
-    return TclBasicBuilder_addDispBeamColumnInt(
-        clientData, interp, argc, argv, theTclDomain, theTclBuilder);
+  if (strcmp(argv[1], "dispBeamColumnInt") == 0) {
+    return TclBasicBuilder_addDispBeamColumnInt(clientData, interp, argc, argv);
+  } 
 
-  } else if (strcmp(argv[1], "ForceBeamColumn") == 0 ||
-             strcmp(argv[1], "DispBeamColumn") == 0 ||
-             strcmp(argv[1], "DispBeamColumn") == 0 ||
-             strcmp(argv[1], "TimoshenkoBeamColumn") == 0 ||
-             strcmp(argv[1], "ForceBeamColumnCBDI") == 0 ||
-             strcmp(argv[1], "ForceBeamColumnCSBDI") == 0 ||
-             strcmp(argv[1], "ForceBeamColumnWarping") == 0 ||
-             strcmp(argv[1], "ForceBeamColumnThermal") == 0 ||
-             strcmp(argv[1], "ElasticForceBeamColumnWarping") == 0 ||
-             strcmp(argv[1], "DispBeamColumnNL") == 0 ||
-             strcmp(argv[1], "DispBeamColumnThermal") == 0 ||
-             strcmp(argv[1], "ElasticForceBeamColumn") == 0 ||
-             strcmp(argv[1], "NonlinearBeamColumn") == 0 ||
-             strcmp(argv[1], "DispBeamColumnWithSensitivity") == 0) {
+  else if ((strcmp(argv[1], "WheelRail") == 0)) {
+    return TclBasicBuilder_addWheelRail(clientData, interp, argc, argv);
+  }
+
+  else if (strcmp(argv[1], "DisplFrame") == 0 ||
+           strcmp(argv[1], "CubicFrame") == 0 ||
+           strcmp(argv[1], "ForceFrame") == 0 ||
+           strcmp(argv[1], "ExactFrame") == 0 ||
+           strcmp(argv[1], "ForceDeltaFrame") == 0 ||
+
+           strcmp(argv[1], "ForceBeamColumn") == 0 ||
+           strcmp(argv[1], "DispBeamColumn") == 0 ||
+           strcmp(argv[1], "DispBeamColumn") == 0 ||
+           strcmp(argv[1], "TimoshenkoBeamColumn") == 0 ||
+           strcmp(argv[1], "ForceBeamColumnCBDI") == 0 ||
+           strcmp(argv[1], "ForceBeamColumnCSBDI") == 0 ||
+           strcmp(argv[1], "ForceBeamColumnWarping") == 0 ||
+           strcmp(argv[1], "ForceBeamColumnThermal") == 0 ||
+           strcmp(argv[1], "ElasticForceBeamColumnWarping") == 0 ||
+           strcmp(argv[1], "DispBeamColumnNL") == 0 ||
+           strcmp(argv[1], "DispBeamColumnThermal") == 0 ||
+           strcmp(argv[1], "ElasticForceBeamColumn") == 0 ||
+           strcmp(argv[1], "NonlinearBeamColumn") == 0 ||
+           strcmp(argv[1], "DispBeamColumnWithSensitivity") == 0) {
 
     return TclBasicBuilder_addForceBeamColumn(clientData, interp, argc, argv);
 
   } else if ((strstr(argv[1], "BeamWithHinges") != 0) ||
              (strcmp(argv[1], "BeamWithHinges") == 0)) {
-    return TclBasicBuilder_addBeamWithHinges(clientData, interp, argc, argv,
-                                             theTclDomain, theTclBuilder);
+    return TclBasicBuilder_addBeamWithHinges(clientData, interp, argc, argv);
 
   //
   //
@@ -482,15 +458,13 @@ TclCommand_addElement(ClientData clientData, Tcl_Interp *interp, int argc, TCL_C
   //
   } else if ((strcmp(argv[1], "Joint2D") == 0) ||
              (strcmp(argv[1], "Joint2d") == 0)) {
-    int result =
-        TclBasicBuilder_addJoint2D(clientData, interp, argc, argv, theTclDomain);
+    return
+        TclBasicBuilder_addJoint2D(clientData, interp, argc, argv);
 
-    return result;
+
   } else if ((strcmp(argv[1], "Joint3D") == 0) ||
              (strcmp(argv[1], "Joint3d") == 0)) {
-    int result = TclBasicBuilder_addJoint3D(clientData, interp, argc, argv,
-                                            theTclDomain, theTclBuilder);
-    return result;
+    return TclBasicBuilder_addJoint3D(clientData, interp, argc, argv);
   }
 
   else if (strcmp(argv[1], "genericClient") == 0) {
@@ -505,22 +479,15 @@ TclCommand_addElement(ClientData clientData, Tcl_Interp *interp, int argc, TCL_C
              (strcmp(argv[1], "inelastic2dYS03") == 0) ||
              (strcmp(argv[1], "inelastic2dYS04") == 0) ||
              (strcmp(argv[1], "inelastic2dYS05") == 0)) {
-    int result = TclBasicBuilder_addElement2dYS(clientData, interp, argc, argv,
-                                                theTclDomain, theTclBuilder);
-    return result;
+    return TclBasicBuilder_addElement2dYS(clientData, interp, argc, argv);
 
   } else if ((strcmp(argv[1], "element2dGNL") == 0) ||
              (strcmp(argv[1], "elastic2dGNL") == 0)) {
-    int result = TclBasicBuilder_addElastic2dGNL(clientData, interp, argc, argv,
-                                                 theTclDomain, theTclBuilder);
-    return result;
+    return TclBasicBuilder_addElastic2dGNL(clientData, interp, argc, argv);
   }
 
   else if (strcmp(argv[1], "beamColumnJoint") == 0) {
-    int eleArgStart = 1;
-    int result = TclBasicBuilder_addBeamColumnJoint(clientData, interp, argc, argv,
-                                                    theTclDomain, eleArgStart);
-    return result;
+    return TclBasicBuilder_addBeamColumnJoint(clientData, interp, argc, argv);
   }
 
   // Kikuchi
@@ -568,8 +535,6 @@ TclCommand_addElement(ClientData clientData, Tcl_Interp *interp, int argc, TCL_C
     while (eleCommands != NULL && found == false) {
       if (strcmp(argv[1], eleCommands->funcName) == 0) {
 
-        // OPS_ResetInput(clientData, interp, 2, argc, argv, theTclDomain,
-        //                theTclBuilder);
         OPS_ResetInputNoBuilder(clientData, interp, 2, argc, argv, theTclDomain);
         void *theRes = (*(eleCommands->funcPtr))();
         if (theRes != 0) {
@@ -1883,9 +1848,9 @@ TclBasicBuilder_addYamamotoBiaxialHDR(ClientData clientData, Tcl_Interp *interp,
 
 int
 TclBasicBuilder_addWheelRail(ClientData clientData, Tcl_Interp *interp, int argc,
-                             TCL_Char ** const argv, Domain *theTclDomain,
-                             TclBasicBuilder *unused, int eleArgStart)
+                             TCL_Char ** const argv)
 {
+  constexpr static int eleArgStart = 1;
   assert(clientData != nullptr);
   BasicModelBuilder *builder = static_cast<BasicModelBuilder*>(clientData);
 
@@ -2081,71 +2046,5 @@ TclBasicBuilder_addWheelRail(ClientData clientData, Tcl_Interp *interp, int argc
   }
 
   return 0;
-}
-
-
-#include <Tri31.h>
-Element *
-TclDispatch_newTri31(ClientData clientData, Tcl_Interp *interp, int argc, TCL_Char **const argv)
-{
-  BasicModelBuilder* builder = static_cast<BasicModelBuilder*>(clientData);
-
-  // Pointer to an element that will be returned
-  Element *theElement = nullptr;
-  
-  if (argc < 7) {
-    opserr << "Invalid #args, want: element element Tri31 eleTag? iNode? jNode? kNode? thk? type? matTag? <pressure? rho? b1? b2?>\n";
-    return nullptr;
-  }
-
-  int iData[5];
-  char *theType;
-  double dData[5];
-  dData[1] = 0.0;
-  dData[2] = 0.0;
-  dData[3] = 0.0;
-  dData[4] = 0.0;
-  
-  int numData = 4;
-  if (OPS_GetIntInput(&numData, iData) != 0) {
-    opserr << "WARNING invalid integer data: element Tri31\n";
-    return 0;
-  }
-  
-  numData = 1;
-  if (OPS_GetDoubleInput(&numData, dData) != 0) {
-    opserr << "WARNING invalid thickness data: element Tri31 " << iData[0] << endln;
-    return 0;
-  }
-  
-  theType = (char*)OPS_GetString();
-  
-  numData = 1;
-  if (OPS_GetIntInput(&numData, &iData[4]) != 0) {
-    opserr << "WARNING invalid integer data: element Tri31\n";
-    return 0;
-  }
-  int matID = iData[4];
-  
-  NDMaterial *theMaterial = builder->getTypedObject<NDMaterial>(matID);
-  if (theMaterial == 0) {
-    opserr << "WARNING element Tri31 " << iData[0] << endln;
-    opserr << " Material: " << matID << "not found\n";
-    return 0;
-  }
-  
-  if (argc == 11) {
-    numData = 4;
-    if (OPS_GetDoubleInput(&numData, &dData[1]) != 0) {
-      opserr << "WARNING invalid optional data: element Tri31 " << iData[0] << endln;
-      return 0;
-    }
-  }
-  
-  // parsing was successful, allocate the element
-  theElement = new Tri31(iData[0], iData[1], iData[2], iData[3],
-			 *theMaterial, theType, 
-			 dData[0], dData[1], dData[2], dData[3], dData[4]);
-  return theElement;
 }
 

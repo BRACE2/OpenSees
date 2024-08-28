@@ -8,6 +8,8 @@ target_include_directories(OPS_Material PUBLIC ${CMAKE_CURRENT_LIST_DIR})
 
 target_sources(OPS_Material_f PRIVATE STEELDR.f DoddRestrepo.f)
 
+add_subdirectory(ReinforcingSteel)
+
 target_sources(OPS_Material
     PRIVATE
       DoddRestr.cpp
@@ -25,7 +27,6 @@ target_sources(OPS_Material
       Steel4.cpp
       SteelBRB.cpp
       SteelDRC.cpp
-      STEELDR.f
       SteelECThermal.cpp
       SteelFractureDI.cpp
       SteelMP.cpp

@@ -1,7 +1,8 @@
-/* ****************************************************************** **
-**    OpenSees - Open System for Earthquake Engineering Simulation    **
-**          Pacific Earthquake Engineering Research Center            **
-** ****************************************************************** */
+//===----------------------------------------------------------------------===//
+//
+//        OpenSees - Open System for Earthquake Engineering Simulation
+//
+//===----------------------------------------------------------------------===//
 //
 // Purpose: This file contains the class definition for TclPackageClassBroker.
 // TclPackageClassBroker is is an object broker class that is meant to become
@@ -66,7 +67,7 @@ using namespace OpenSees::Hash::literals;
 #include "Steel2.h"
 #include "Steel4.h"
 #include "FatigueMaterial.h"
-#include "ReinforcingSteel.h"
+#include "ReinforcingSteel/ReinforcingSteel.h"
 #include "HardeningMaterial.h"
 #include "HystereticMaterial.h"
 #include "EPPGapMaterial.h"
@@ -223,8 +224,13 @@ using namespace OpenSees::Hash::literals;
 #include "Frame/Elastic/ModElasticBeam3d.h"
 #include "Frame/Elastic/ElasticTimoshenkoBeam2d.h"
 #include "Frame/Elastic/ElasticTimoshenkoBeam3d.h"
-#include "Frame/ForceInterp/ForceBeamColumn2d.h"
-#include "Frame/ForceInterp/ForceBeamColumn3d.h"
+#include "Frame/Other/Force/ForceBeamColumn2d.h"
+#include "Frame/Other/Force/ForceBeamColumn3d.h"
+#include "Frame/Other/Displ/DispBeamColumn2d.h"
+#include "Frame/Other/Displ/DispBeamColumn3d.h"
+#include "Frame/Other/Displ/DispBeamColumnAsym3d.h"   // Xinlong Du
+#include "Frame/Other/Mixed/MixedBeamColumnAsym3d.h"  // Xinlong Du
+
 
 #include "UWelements/SSPquad.h"
 #include "UWelements/SSPquadUP.h"
@@ -241,10 +247,6 @@ using namespace OpenSees::Hash::literals;
 #include "Other/PML/PML2D.h"
 #include "Other/PML/PML3D.h"
 
-#include "Frame/DisplInterp/DispBeamColumn2d.h"
-#include "Frame/DisplInterp/DispBeamColumn3d.h"
-#include "Frame/DisplInterp/DispBeamColumnAsym3d.h"   // Xinlong Du
-#include "Frame/MixedInterp/MixedBeamColumnAsym3d.h"  // Xinlong Du
 #include "Shell/ShellMITC4.h"
 #include "Shell/ShellMITC9.h"
 #include "Shell/ShellDKGQ.h"   // Added by Lisha Wang, Xinzheng Lu, Linlin Xie, Song Cen & Quan Gu
@@ -324,6 +326,9 @@ using namespace OpenSees::Hash::literals;
 
 // node header files
 #include "Node.h"
+#ifdef HEAP_NODE
+#include "HeapNode.h"
+#endif
 
 #include "FileStream.h"
 #include "StandardStream.h"
@@ -740,7 +745,11 @@ TclPackageClassBroker::getNewNode(int classTag)
 {
   switch (classTag) {
   case NOD_TAG_Node:
+#ifdef HEAP_NODE
+    return new HeapNode(classTag);
+#else
     return new Node(classTag);
+#endif
 
   default:
     opserr << "TclPackageClassBroker::getNewNode - ";

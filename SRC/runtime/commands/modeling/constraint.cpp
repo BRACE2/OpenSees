@@ -1,7 +1,8 @@
-/* ****************************************************************** **
-**    OpenSees - Open System for Earthquake Engineering Simulation    **
-**          Pacific Earthquake Engineering Research Center            **
-** ****************************************************************** */
+//===----------------------------------------------------------------------===//
+//
+//        OpenSees - Open System for Earthquake Engineering Simulation
+//
+//===----------------------------------------------------------------------===//
 //
 //
 #include <tcl.h>
@@ -10,9 +11,9 @@
 #include <ID.h>
 #include <Node.h>
 #include <Domain.h>
-#include <runtimeAPI.h>
-#include <G3_Logging.h>
-#include <runtime/BasicModelBuilder.h>
+#include <Parsing.h>
+#include <Logging.h>
+#include <BasicModelBuilder.h>
 
 #include <SP_Constraint.h>
 #include <SP_ConstraintIter.h>
