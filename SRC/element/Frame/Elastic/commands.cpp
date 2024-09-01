@@ -10,6 +10,7 @@
 // Written: fmk,cmp
 // Created: 07/99
 //
+#if 1
 #include <array>
 #include <vector>
 #include <stdlib.h>
@@ -31,7 +32,7 @@
 #include <FrameSection.h>
 
 #include <BasicModelBuilder.h>
-
+#endif
 //
 // element NAME 
 //    $tag $iNode $jNode
@@ -53,17 +54,6 @@
 //   element elasticBeamColumn $eleTag $iNode $jNode $secTag $transfTag <-mass $massDens> <-cMass>
 //
 
-enum class Args2D : int {
-  A, E, Iz, Transform, End, 
-  // values coming after End wont be handled
-  // by ArgumentTracker; these need to be here for
-  // the template to compile.
-  G, J, Iy
-};
-
-enum class Args3D : int {
-  A, E, G, J, Iy, Iz, Transform, End
-};
 
 template <typename Position>
 int
@@ -167,6 +157,38 @@ Parse_ElasticBeam(ClientData clientData, Tcl_Interp *interp, int argc,
       while (tracker.current() != Position::Transform && 
              tracker.current() != Position::End)
         tracker.increment();
+    }
+
+    // Release
+    else if ((strcmp(argv[argi], "-release") == 0) ||
+             (strcmp(argv[argi], "-releasez") == 0)) {
+      if (argc < argi + 2) {
+        opserr << OpenSees::PromptValueError
+               << "not enough arguments, expected -release $release?\n";
+        return TCL_ERROR;
+      }
+
+      if (Tcl_GetInt(interp, argv[argi+1], &options.relz_flag) != TCL_OK) {
+        opserr << OpenSees::PromptValueError 
+               << "invalid release flag.\n";
+        return TCL_ERROR;
+      }
+      argi += 1;
+    }
+    else if ((strcmp(argv[argi], "-releasey") == 0) ||
+             (strcmp(argv[argi], "-releasey") == 0)) {
+      if (argc < argi + 2) {
+        opserr << OpenSees::PromptValueError
+               << "not enough arguments, expected -releasey $release?\n";
+        return TCL_ERROR;
+      }
+
+      if (Tcl_GetInt(interp, argv[argi+1], &options.rely_flag) != TCL_OK) {
+        opserr << OpenSees::PromptValueError 
+               << "invalid release flag.\n";
+        return TCL_ERROR;
+      }
+      argi += 1;
     }
 
     // Transform
@@ -427,7 +449,7 @@ Parse_ElasticBeam(ClientData clientData, Tcl_Interp *interp, int argc,
 
         case Position::End:
           opserr << OpenSees::PromptParseError
-                 << "unexpected argument" << argv[i] << "\n";
+                 << "unexpected argument " << argv[i] << "\n";
           return TCL_ERROR;
       }
     }
@@ -437,6 +459,45 @@ Parse_ElasticBeam(ClientData clientData, Tcl_Interp *interp, int argc,
   if (tracker.current() != Position::End) {
       opserr << OpenSees::PromptParseError
              << "Missing required positional arguments\n";
+
+      while (tracker.current() != Position::End) {
+        switch (tracker.current()) {
+//        case Position::Tag :
+//          opserr << "tag ";
+//          break;
+          case Position::E:
+            opserr << "E ";
+            break;
+          case Position::A:
+            opserr << "A ";
+            break;
+          case Position::Iz:
+            opserr << "Iz ";
+            break;
+          case Position::Iy:
+            opserr << "Iy ";
+            break;
+          case Position::G:
+            opserr << "G ";
+            break;
+          case Position::J:
+            opserr << "J ";
+            break;
+          case Position::Transform:
+            opserr << "transform ";
+            break;
+          case Position::End:
+            break;
+        }
+
+        if (tracker.current() == Position::End)
+          break;
+
+        tracker.consume(tracker.current());
+      }
+
+      opserr << "\n";
+
       return TCL_ERROR;
   }
 
@@ -480,10 +541,13 @@ Parse_ElasticBeam(ClientData clientData, Tcl_Interp *interp, int argc,
       theBeam = new ElasticBeam2d(tag, beam_data.A, beam_data.E, beam_data.Iz, 
                                   iNode, jNode, *theTrans2d,
                                   beam_data.thermal_coeff, beam_data.thermal_depth, 
-                                  mass, options.mass_type);
+                                  mass, options.mass_type,
+                                  options.relz_flag);
     }
 
-  } else { // ndm == 3
+  } else {
+    // ndm == 3
+
     //
     // Some final validation
     //
@@ -503,7 +567,8 @@ Parse_ElasticBeam(ClientData clientData, Tcl_Interp *interp, int argc,
                                  options.mass_type,
                                  use_mass,
                                  options.relz_flag, 
-                                 options.rely_flag);
+                                 options.rely_flag,
+                                 options.geom_flag);
 
     } else {
       // now create the beam and add it to the Domain
@@ -516,8 +581,8 @@ Parse_ElasticBeam(ClientData clientData, Tcl_Interp *interp, int argc,
                                    *theTrans3d, mass,
                                    options.mass_type,
                                    options.relz_flag, 
-                                   options.rely_flag);
-                                // options.geom_flag);
+                                   options.rely_flag,
+                                   options.geom_flag);
 
       } else {
         theBeam = new ElasticBeam3d(tag, 
@@ -551,6 +616,18 @@ TclBasicBuilder_addElasticBeam(ClientData clientData, Tcl_Interp *interp, int ar
   BasicModelBuilder *builder = (BasicModelBuilder*)clientData;
 
   const int ndm = builder->getNDM();
+
+  enum class Args2D : int {
+    A, E, Iz, Transform, End, 
+    // values coming after End wont be handled
+    // by ArgumentTracker; these need to be here for
+    // the template to compile.
+    G, J, Iy
+  };
+
+  enum class Args3D : int {
+    A, E, G, J, Iy, Iz, Transform, End
+  };
 
   if (ndm == 2)
     return Parse_ElasticBeam<Args2D>(clientData, interp, argc, argv);

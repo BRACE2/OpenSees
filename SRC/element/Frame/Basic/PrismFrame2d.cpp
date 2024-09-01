@@ -11,6 +11,10 @@
 //
 // Written: cc,cmp 05/2024
 //
+#include <Vector.h>
+#include <VectorND.h>
+#include <Matrix.h>
+#include <MatrixND.h>
 #include <PrismFrame2d.h>
 #include <ElementalLoad.h>
 
@@ -26,15 +30,20 @@
 #include <ElementResponse.h>
 #include <math.h>
 
+using OpenSees::VectorND;
+using OpenSees::MatrixND;
+
 Matrix PrismFrame2d::K(6,6);
 Vector PrismFrame2d::P(6);
 
 PrismFrame2d::PrismFrame2d()
   :Element(0,ELE_TAG_ElasticBeam2d), 
-   A(0.0), E(0.0), I(0.0), alpha(0.0), depth(0.0), rho(0.0), 
-   cMass(0), release(0),
+   A(0.0), E(0.0), Iz(0.0), alpha(0.0), depth(0.0), rho(0.0), 
+   mass_flag(0), 
+   release(0),
    Q(6),
-   connectedExternalNodes(2), theCoordTransf(0)
+   connectedExternalNodes(2), 
+   theCoordTransf(nullptr)
 {
   q.zero();
   q0.zero();
@@ -51,8 +60,9 @@ PrismFrame2d::PrismFrame2d(int tag, double a, double e, double i,
                            double Alpha, double depth_, double r, int cm,
                            int rel, int geom_flag_)
   :Element(tag,ELE_TAG_ElasticBeam2d), 
-   A(a), E(e), I(i), alpha(Alpha), depth(depth_), rho(r), 
-   cMass(cm), release(rel), 
+   A(a), E(e), Iz(i), Ay(0), 
+   alpha(Alpha), depth(depth_), rho(r), 
+   mass_flag(cm), release(rel), 
    geom_flag(geom_flag_),
    Q(6), connectedExternalNodes(2), theCoordTransf(nullptr)
 {
@@ -82,12 +92,18 @@ PrismFrame2d::PrismFrame2d(int tag, int Nd1, int Nd2,
                            double r, int cm, bool use_mass, int rel,
                            int geom_flag_)
   : Element(tag,ELE_TAG_ElasticBeam2d), 
-    alpha(Alpha), depth(depth_), rho(r),
-    cMass(cm), release(rel),
+    Ay(0),
+    alpha(Alpha), depth(depth_), 
+    rho(r), mass_flag(cm), 
+    release(rel),
     geom_flag(geom_flag_),
     Q(6), connectedExternalNodes(2), theCoordTransf(nullptr)
 {
-  E = 1.0;
+
+  section.getIntegral(Field::Unit,   State::Init, A);
+  section.getIntegral(Field::UnitY,  State::Init, Ay);
+  section.getIntegral(Field::UnitYY, State::Init, Iz);
+
 
   const Matrix &sectTangent = section.getInitialTangent();
   const ID &sectCode = section.getType();
@@ -95,10 +111,10 @@ PrismFrame2d::PrismFrame2d(int tag, int Nd1, int Nd2,
     int code = sectCode(i);
     switch(code) {
     case SECTION_RESPONSE_P:
-      A = sectTangent(i,i);
+      E = sectTangent(i,i)/A;
       break;
-    case SECTION_RESPONSE_MZ:
-      I = sectTangent(i,i);
+    case SECTION_RESPONSE_VY:
+      G  = sectTangent(i,i)/Ay;
       break;
     default:
       break;
@@ -191,6 +207,11 @@ PrismFrame2d::setDomain(Domain *theDomain)
     exit(-1);
   }
 
+  if (G != 0 && Ay != 0)
+    phi = 12.0 * E * Iz / (L * L * G * Ay);
+  else
+    phi = 0;
+
   formBasicStiffness(km);
   ke = km; // 
 }
@@ -203,12 +224,12 @@ PrismFrame2d::formBasicStiffness(OpenSees::MatrixND<3,3>& kb) const
   //
   kb.zero();
 
-  kb(0,0) = E*A/L;  
+  kb(0,0) = E*A/L;
 
-  double EI     = E*I;
+  double EI     = E*Iz;
   if (release == 0) {
-    kb(1,1) = kb(2,2) = 4.0*EI/L;
-    kb(2,1) = kb(1,2) = 2.0*EI/L;    
+    kb(1,1) = kb(2,2) = EI*(4+phi)/(L*(1+phi));
+    kb(2,1) = kb(1,2) = EI*(2-phi)/(L*(1+phi));    
   }
   if (release == 1) { // release I
     kb(2,2) = 3.0*EI/L;
@@ -216,16 +237,25 @@ PrismFrame2d::formBasicStiffness(OpenSees::MatrixND<3,3>& kb) const
   if (release == 2) { // release J
     kb(1,1) = 3.0*EI/L;
   }
+  
+  double r[3] = {(double)(release&0b100), 
+                 (double)(release&0b001),
+                 (double)(release&0b010)};
+
+  MatrixND<3,3> ah {{
+    {1-r[0],        0,                  0          },
+    {  0   ,      1-r[1],       -0.5*(1-r[2])*r[1] },
+    {  0   ,-0.5*(1-r[1])*r[2],       1-r[2]       }}};
 }
 
 int
 PrismFrame2d::commitState()
 {
   int retVal = 0;
-  // call element commitState to do any base class stuff
+  // call base class stuff
   if ((retVal = this->Element::commitState()) != 0) {
     opserr << "PrismFrame2d::commitState () - failed in base class";
-  }    
+  }
   retVal += theCoordTransf->commitState();
   return retVal;
 }
@@ -248,42 +278,45 @@ PrismFrame2d::update()
   int ok = theCoordTransf->update();
 
   const Vector &v = theCoordTransf->getBasicTrialDisp();
+  L = theCoordTransf->getInitialLength();
 
-  double N = E*A/L*v(0);
-
-  // initialize with linear coefficients
-  double A = 4,
-         B = 2;
+  double N = E*A/L*v[0];
 
   switch (geom_flag) {
     case 0:
     break;
 
     case 1:
-      kg(1,1) = kg(2,2) =  4.0*N/L;
-      kg(1,2) = kg(2,1) = -1.0*N/L;
+      kg.zero();
+      kg(1,1) = kg(2,2) =  4.0*N*L/30.0;
+      kg(1,2) = kg(2,1) = -1.0*N*L/30.0;
       ke = km + kg;
 
     case 2:
-      double psi = L*std::sqrt(std::fabs(N)/(E*I));
-      if (N < -1.e-6) {
-      // axial force is compressive
+    {
+      // initialize with linear coefficients
+      double A = 4*E*Iz/L,
+             B = 2*E*Iz/L;
+      double psi = L*std::sqrt(std::fabs(N)/(E*Iz));
+      if (N < -1.e-4) {
+        // Axial force is compressive
         double cs = std::cos(psi);
         double sn = std::sin(psi);
-        double C  = E*I/(L*(2.0 - 2.0*cs - psi*sn));
-        A   = psi*(sin(psi)-psi*cs)/(2*(1-cs)-psi*sin(psi));
-        B   = psi*(psi-sin(psi))         /(2*(1-cs)-psi*sin(psi));
+        double C  = psi*E*Iz/L/(2.0*(1 - cs) - psi*sn);
+        A   = C*(sn - psi*cs);
+        B   = C*(psi - sn);
 
       } else if (N > 1.e-4) {
-      // axial force is tensile
+        // Axial force is tensile
         double snh = std::sinh(psi);
         double csh = std::cosh(psi);
-        double C = psi/(2*(csh - 1) - psi*snh);
+        double C   = psi*E*Iz/L/(2*(csh - 1) - psi*snh);
         A   = C*(snh - psi*csh);
         B   = C*(psi - snh);
 
       } else {
       // if axial force is near zero keep linear coefficients
+      
       }
 
       if (std::fabs(N) > 1e-8) {
@@ -293,18 +326,20 @@ PrismFrame2d::update()
         ke = km;
       }
       break;
+    }
   }
+
 #if 0
-  // correct stiffness in the presence of releases
-  if ~isempty(ir) {
-    switch (ir) {
-      case 1:
+  // Account for releases
+  if (release != 0) {
+    switch (release) {
+      case 0:
         k(1,1) = 0;
-      case 2:
-        k(3,3)   = k(2,2) - k(2,3)^2/k(2,2);
+      case 1:
+        k(3,3)   = k(2,2) - std::pow(k(2,3),2)/k(2,2);
         k(2,2:3) = zeros(1,2);
         k(3,2)   = 0;
-      case 3:
+      case 2:
         k(2,2)   = k(3,3)-k(2,3)^2/k(3,3);
         k(3,2:3) = zeros(1,2);
         k(2,3)   = 0;
@@ -333,34 +368,52 @@ PrismFrame2d::getInitialStiff()
 const Matrix &
 PrismFrame2d::getMass()
 {
-  K.Zero();
-  
+  bool mass_initialized;
   if (rho > 0.0)  {
-      // get initial element length
-      if (cMass == 0)  {
-          // lumped mass matrix
-          double m = 0.5*rho*L;
-          K(0,0) = K(1,1) = K(3,3) = K(4,4) = m;
+    // get initial element length
+    if (mass_flag == 0)  {
+        static MatrixND<6,6> M;
+        static Matrix Wrapper(M);
+        M.zero();
+        // lumped mass matrix
+        double m = 0.5*rho*L;
+        M(0,0) = M(1,1) = M(3,3) = M(4,4) = m;
+        return Wrapper;
 
-      } else  {
-          // consistent mass matrix
-          static Matrix ml(6,6);
-          double m = rho*L/420.0;
-          ml(0,0) = ml(3,3) = m*140.0;
-          ml(0,3) = ml(3,0) = m*70.0;
+    } else {
 
-          ml(1,1) = ml(4,4) =  m*156.0;
-          ml(1,4) = ml(4,1) =  m*54.0;
-          ml(2,2) = ml(5,5) =  m*4.0*L*L;
-          ml(2,5) = ml(5,2) = -m*3.0*L*L;
-          ml(1,2) = ml(2,1) =  m*22.0*L;
-          ml(4,5) = ml(5,4) = -ml(1,2);
-          ml(1,5) = ml(5,1) = -m*13.0*L;
-          ml(2,4) = ml(4,2) = -ml(1,5);
+      // consistent mass matrix
+      Matrix mlTrn(6, 6), mlRot(6, 6), ml(6, 6);
+      mlTrn.Zero();
+      mlRot.Zero();
+      ml.Zero();
+      double c1x  = rho * L / 210.0;
+      mlTrn(0, 0) = mlTrn(3, 3) = c1x * 70.0;
+      mlTrn(0, 3) = mlTrn(3, 0) = c1x * 35.0;
+      double c1z                = c1x / pow(1.0 + phi, 2);
+      mlTrn(1, 1) = mlTrn(4, 4) = c1z * (70.0 * phi * phi + 147.0 * phi + 78.0);
+      mlTrn(1, 4) = mlTrn(4, 1) = c1z * (35.0 * phi * phi + 63.0 * phi + 27.0);
+      mlTrn(2, 2) = mlTrn(5, 5) = c1z * L * L / 4.0 * (7.0 * phi * phi + 14.0 * phi + 8.0);
+      mlTrn(2, 5) = mlTrn(5, 2) = -c1z * L * L / 4.0 * (7.0 * phi * phi + 14.0 * phi + 6.0);
+      mlTrn(1, 2) = mlTrn(2, 1) = c1z * L / 4.0 * (35.0 * phi * phi + 77.0 * phi + 44.0);
+      mlTrn(4, 5) = mlTrn(5, 4) = -mlTrn(1, 2);
+      mlTrn(1, 5) = mlTrn(5, 1) = -c1z * L / 4.0 * (35.0 * phi * phi + 63.0 * phi + 26.0);
+      mlTrn(2, 4) = mlTrn(4, 2) = -mlTrn(1, 5);
+      double c2z                = rho / A * Iz / (30.0 * L * pow(1.0 + phi, 2));
+      mlRot(1, 1) = mlRot(4, 4) = c2z * 36.0;
+      mlRot(1, 4) = mlRot(4, 1) = -mlRot(1, 1);
+      mlRot(2, 2) = mlRot(5, 5) = c2z * L * L * (10.0 * phi * phi + 5.0 * phi + 4.0);
+      mlRot(2, 5) = mlRot(5, 2) = c2z * L * L * (5.0 * phi * phi - 5.0 * phi - 1.0);
+      mlRot(1, 2) = mlRot(2, 1) = mlRot(1, 5) = mlRot(5, 1) = -c2z * L * (15.0 * phi - 3.0);
+      mlRot(2, 4) = mlRot(4, 2) = mlRot(4, 5) = mlRot(5, 4) = -mlRot(1, 2);
 
-          // transform local mass matrix to global system
-          K = theCoordTransf->getGlobalMatrixFromLocal(ml);
-      }
+      // add translational and rotational parts
+      ml = mlTrn + mlRot;
+      // transform from local to global system
+      return theCoordTransf->getGlobalMatrixFromLocal(M);
+    }
+
+    mass_initialized = true;
   }
 
   return K;
@@ -506,8 +559,8 @@ PrismFrame2d::addLoad(ElementalLoad *theLoad, double loadFactor)
     double dT = (Ttop2-Tbot2)-(Ttop1-Tbot1);
     double a = alpha/depth;  // constant based on temp difference at top and bottom, 
     // coefficient of thermal expansion and beam depth
-    double M1 = a*E*I*(-dT1+(4.0/3.0)*dT); //Fixed End Moment end 1
-    double M2 = a*E*I*(dT1+(5.0/3.0)*dT); //Fixed End Moment end 2
+    double M1 = a*E*Iz*(-dT1+(4.0/3.0)*dT); //Fixed End Moment end 1
+    double M2 = a*E*Iz*(dT1+(5.0/3.0)*dT); //Fixed End Moment end 2
     double F = alpha*(((Ttop2+Ttop1)/2+(Tbot2+Tbot1)/2)/2)*E*A; // Fixed End Axial Force
     double M1M2divL =(M1+M2)/L; // Fixed End Shear
     
@@ -523,7 +576,7 @@ PrismFrame2d::addLoad(ElementalLoad *theLoad, double loadFactor)
   }
 
   else {
-    opserr << "PrismFrame2d::addLoad()  -- load type unknown for element with tag: " << this->getTag() << endln;
+    opserr << "PrismFrame2d::addLoad()  -- load type unknown for element with tag: " << this->getTag() << "\n";
     return -1;
   }
 
@@ -546,7 +599,7 @@ PrismFrame2d::addInertiaLoadToUnbalance(const Vector &accel)
   }
     
   // want to add ( - fact * M R * accel ) to unbalance
-  if (cMass == 0)  {
+  if (mass_flag == 0)  {
     // take advantage of lumped mass matrix
     double m = 0.5*rho*L;
 
@@ -587,7 +640,7 @@ PrismFrame2d::getResistingForceIncInertia()
   const Vector &accel1 = theNodes[0]->getTrialAccel();
   const Vector &accel2 = theNodes[1]->getTrialAccel();    
   
-  if (cMass == 0)  {
+  if (mass_flag == 0)  {
     // take advantage of lumped mass matrix
     double m = 0.5*rho*L;
 
@@ -636,9 +689,9 @@ PrismFrame2d::sendSelf(int cTag, Channel &theChannel)
     
     data(0) = A;
     data(1) = E; 
-    data(2) = I; 
+    data(2) = Iz; 
     data(3) = rho;
-    data(4) = cMass;
+    data(4) = mass_flag;
     data(5) = this->getTag();
     data(6) = connectedExternalNodes(0);
     data(7) = connectedExternalNodes(1);
@@ -694,7 +747,7 @@ PrismFrame2d::recvSelf(int cTag, Channel &theChannel, FEM_ObjectBroker &theBroke
 
   A = data(0);
   E = data(1);
-  I = data(2); 
+  Iz = data(2); 
   alpha = data(10);
   depth = data(11);
 
@@ -705,7 +758,7 @@ PrismFrame2d::recvSelf(int cTag, Channel &theChannel, FEM_ObjectBroker &theBroke
   release = (int)data(16);
   
   rho = data(3);
-  cMass = (int)data(4);
+  mass_flag = (int)data(4);
   this->setTag((int)data(5));
   connectedExternalNodes(0) = (int)data(6);
   connectedExternalNodes(1) = (int)data(7);
@@ -745,9 +798,6 @@ PrismFrame2d::recvSelf(int cTag, Channel &theChannel, FEM_ObjectBroker &theBroke
 void
 PrismFrame2d::Print(OPS_Stream &s, int flag)
 {
-  // to update forces!
-  this->getResistingForce();
-
   if (flag == -1) {
     int eleTag = this->getTag();
     s << "EL_BEAM\t" << eleTag << "\t";
@@ -757,19 +807,19 @@ PrismFrame2d::Print(OPS_Stream &s, int flag)
 
   if (flag == OPS_PRINT_CURRENTSTATE) {
     this->getResistingForce();
-    s << "\nPrismFrame2d: " << this->getTag() << endln;
+    s << "\nPrismFrame2d: " << this->getTag() << "\n";
     s << "\tConnected Nodes: " << connectedExternalNodes ;
-    s << "\tCoordTransf: " << theCoordTransf->getTag() << endln;
-    s << "\tmass density:  " << rho << ", cMass: " << cMass << endln;
-    s << "\trelease code:  " << release << endln;
+    s << "\tCoordTransf: " << theCoordTransf->getTag() << "\n";
+    s << "\tmass density:  " << rho << ", mass_flag: " << mass_flag << "\n";
+    s << "\trelease code:  " << release << "\n";
     double P  = q[0];
     double M1 = q[1];
     double M2 = q[2];
     double V = (M1+M2)/L;
     s << "\tEnd 1 Forces (P V M): " << -P+p0[0]
-      << " " << V+p0[1] << " " << M1 << endln;
+      << " " << V+p0[1] << " " << M1 << "\n";
     s << "\tEnd 2 Forces (P V M): " << P
-      << " " << -V+p0[2] << " " << M2 << endln;
+      << " " << -V+p0[2] << " " << M2 << "\n";
   }
 
   if (flag == OPS_PRINT_PRINTMODEL_JSON) {
@@ -778,12 +828,14 @@ PrismFrame2d::Print(OPS_Stream &s, int flag)
         s << "\"type\": \"PrismFrame2d\", ";
     s << "\"nodes\": [" << connectedExternalNodes(0) << ", " << connectedExternalNodes(1) << "], ";
         s << "\"E\": " << E << ", ";
-        s << "\"A\": "<< A << ", ";
-    s << "\"Iz\": "<< I << ", ";
+        s << "\"G\": " << G << ", ";
+        s << "\"A\": " << A << ", ";
+        s << "\"Ay\": " << Ay << ", ";
+    s << "\"Iz\": "<< Iz << ", ";
     s << "\"massperlength\": "<< rho << ", ";
     s << "\"release\": "<< release << ", ";
-    s << "\"delta\": "<< geom_flag << ", ";
-    s << "\"mass_flag\": "<< cMass << ", ";
+    s << "\"kinematics\": "<< geom_flag << ", ";
+    s << "\"mass_flag\": "<< mass_flag << ", ";
     s << "\"crdTransformation\": \"" << theCoordTransf->getTag() << "\"}";
   }
 }
@@ -812,10 +864,10 @@ PrismFrame2d::setResponse(const char **argv, int argc, OPS_Stream &output)
     output.tag("ResponseType","Py_2");
     output.tag("ResponseType","Mz_2");
 
-    theResponse =  new ElementResponse(this, 2, P);
+    theResponse =  new ElementResponse(this, 2, Vector(6));
   
   // local forces
-  }    else if (strcmp(argv[0],"localForce") == 0 || strcmp(argv[0],"localForces") == 0) {
+  } else if (strcmp(argv[0],"localForce") == 0 || strcmp(argv[0],"localForces") == 0) {
 
     output.tag("ResponseType","N_1");
     output.tag("ResponseType","V_1");
@@ -824,10 +876,10 @@ PrismFrame2d::setResponse(const char **argv, int argc, OPS_Stream &output)
     output.tag("ResponseType","V_2");
     output.tag("ResponseType","M_2");
     
-    theResponse = new ElementResponse(this, 3, P);
+    theResponse = new ElementResponse(this, 3, Vector(6));
 
   // basic forces
-  }    else if (strcmp(argv[0],"basicForce") == 0 || strcmp(argv[0],"basicForces") == 0) {
+  } else if (strcmp(argv[0],"basicForce") == 0 || strcmp(argv[0],"basicForces") == 0) {
 
     output.tag("ResponseType","N");
     output.tag("ResponseType","M_1");
@@ -866,31 +918,32 @@ PrismFrame2d::setResponse(const char **argv, int argc, OPS_Stream &output)
 int
 PrismFrame2d::getResponse (int responseID, Information &info)
 {
-  double N, M1, M2, V;
   this->getResistingForce();
 
   switch (responseID) {
   case 1: // stiffness
     return info.setMatrix(this->getTangentStiff());
-    
+
   case 2: // global forces
     return info.setVector(this->getResistingForce());
     
   case 3: // local forces
+  {
     // Axial
-    N = q[0];
+    double N = q[0];
     P(3) =  N;
     P(0) = -N+p0[0];
     // Moment
-    M1 = q[1];
-    M2 = q[2];
+    double M1 = q[1];
+    double M2 = q[2];
     P(2) = M1;
     P(5) = M2;
     // Shear
-    V = (M1+M2)/L;
+    double V = (M1+M2)/L;
     P(1) =  V + p0[1];
     P(4) = -V + p0[2];
     return info.setVector(P);
+  }
     
   case 4: // basic forces
     return info.setVector(q);
@@ -921,7 +974,7 @@ PrismFrame2d::setParameter(const char **argv, int argc, Parameter &param)
   }
   // I of the beam interior
   if (strcmp(argv[0],"I") == 0) {
-    param.setValue(I);
+    param.setValue(Iz);
     return param.addObject(3, this);
   }
   // mass per length
@@ -945,13 +998,13 @@ PrismFrame2d::updateParameter(int parameterID, Information &info)
   case -1:
     return -1;
   case 1:
-    E = info.theDouble;
+    E  = info.theDouble;
     return 0;
   case 2:
-    A = info.theDouble;
+    A  = info.theDouble;
     return 0;
   case 3:
-    I = info.theDouble;
+    Iz = info.theDouble;
     return 0;
   case 4:
     rho = info.theDouble;

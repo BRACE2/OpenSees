@@ -10,11 +10,13 @@
 //
 //  de Souza, R.M. (2000) 
 //    "Force-based finite element for large displacement inelastic analysis of frames". 
-//    University of California, Berkeley. Available at: https://www.proquest.com/docview/304624959/D8D738C3AC49427EPQ/1?accountid=14496.
+//    University of California, Berkeley. 
+//    Available at: https://www.proquest.com/docview/304624959/D8D738C3AC49427EPQ/1?accountid=14496.
 //
 //  Neuenhofer, A. and Filippou, F.C. (1998) 
 //    "Geometrically Nonlinear Flexibility-Based Frame Finite Element", 
-//    Journal of Structural Engineering, 124(6), pp. 704–711. Available at: https://doi.org/10/d8jvb5.
+//    Journal of Structural Engineering, 124(6), pp. 704–711. 
+//    Available at: https://doi.org/10/d8jvb5.
 //
 //  Spacone, E., V. Ciampi, and F. C. Filippou (1996). 
 //    "Mixed Formulation of Nonlinear Beam Finite Element."
@@ -42,6 +44,7 @@
 #include <string.h>
 #include <float.h>
 
+#include <Node.h>
 #include <Information.h>
 #include <Parameter.h>
 #include <ForceDeltaFrame3d.h>
@@ -51,6 +54,7 @@
 #include <FEM_ObjectBroker.h>
 
 #include <ElementResponse.h>
+#include <BeamIntegration.h>
 #include <CompositeResponse.h>
 #include <ElementalLoad.h>
 
@@ -469,6 +473,7 @@ ForceDeltaFrame3d::update()
       wp.addMatrixVector(0.0, lskp, kappa, L);
       wp.addMatrixVector(1.0, lsgp, gamma, 1.0);
     }
+
     wz.addMatrixVector(0.0, ls, kappay, L * L);
     if (shear_flag) {
       wz.addMatrixVector(1.0, lsg, gammaz, L);
@@ -1107,9 +1112,6 @@ ForceDeltaFrame3d::computedwdq(Matrix& dwidq,
   double L        = theCoordTransf->getInitialLength();
   double oneOverL = 1.0 / L;
 
-//double xi[maxNumSections];
-//stencil->getSectionLocations(numSections, L, xi);
-
   Matrix A(2 * numSections, 2 * numSections);
   Matrix b(2 * numSections, nq);
 
@@ -1371,57 +1373,98 @@ ForceDeltaFrame3d::computeSectionForces(VectorND<nsr>& sp, int isec)
         default:                  break;
         }
       }
-    } else if (type == LOAD_TAG_Beam3dPartialUniformLoad) {
-      double wa = data(2) * loadFactor; // Axial
-      double wy = data(0) * loadFactor; // Transverse
-      double wz = data(1) * loadFactor; // Transverse
-      double a  = data(3) * L;
-      double b  = data(4) * L;
-
-      double Fa  = wa * (b - a); // resultant axial load
-      double Fy  = wy * (b - a); // resultant transverse load
-      double Fz  = wz * (b - a); // resultant transverse load
-      double c   = a + 0.5 * (b - a);
+    } 
+    else if (type == LOAD_TAG_Beam3dPartialUniformLoad) {
+      double wy = data(0) * loadFactor;  // Transverse Y at start
+      double wz = data(1) * loadFactor;  // Transverse Z at start
+      double wa = data(2) * loadFactor;  // Axial at start
+      double a = data(3)*L;
+      double b = data(4)*L;
+      double wyb = data(5) * loadFactor;  // Transverse Y at end
+      double wzb = data(6) * loadFactor;  // Transverse Z at end
+      double wab = data(7) * loadFactor;  // Axial at end
+      double Fa = wa * (b - a) + 0.5 * (wab - wa) * (b - a); // resultant axial load
+      double Fy = wy * (b - a); // resultant transverse load
+      double Fz = wz * (b - a); // resultant transverse load
+      double c = a + 0.5 * (b - a);
       double VyI = Fy * (1 - c / L);
       double VyJ = Fy * c / L;
       double VzI = Fz * (1 - c / L);
       double VzJ = Fz * c / L;
-
+      Fy = 0.5 * (wyb - wy) * (b - a); // resultant transverse load
+      Fz = 0.5 * (wzb - wz) * (b - a); // resultant transverse load
+      c = a + 2.0 / 3.0 * (b - a);
+      VyI += Fy * (1 - c / L);
+      VyJ += Fy * c / L;
+      VzI += Fz * (1 - c / L);
+      VzJ += Fz * c / L;
+     
       for (int ii = 0; ii < nsr; ii++) {
-
         if (x <= a) {
-          switch (scheme[ii]) {
-          case SECTION_RESPONSE_P:  sp[ii] += Fa; break;
-          case SECTION_RESPONSE_MZ: sp[ii] -= VyI * x; break;
-          case SECTION_RESPONSE_MY: sp[ii] += VzI * x; break;
-          case SECTION_RESPONSE_VY: sp[ii] -= VyI; break;
-          case SECTION_RESPONSE_VZ: sp[ii] -= VzI; break;
-          default:                  break;
-          }
-        } else if (x >= b) {
-          switch (scheme[ii]) {
-          case SECTION_RESPONSE_MZ: sp[ii] += VyJ * (x - L); break;
-          case SECTION_RESPONSE_MY: sp[ii] -= VzJ * (x - L); break;
-          case SECTION_RESPONSE_VY: sp[ii] += VyJ; break;
-          case SECTION_RESPONSE_VZ: sp[ii] += VzJ; break;
-          default:                  break;
-          }
-        } else {
-          switch (scheme[ii]) {
-          case SECTION_RESPONSE_P: sp[ii] += Fa - wa * (x - a); break;
+          switch(scheme[ii]) {
+          case SECTION_RESPONSE_P:
+            sp(ii) += Fa;
+            break;
           case SECTION_RESPONSE_MZ:
-            sp[ii] += -VyI * x + 0.5 * wy * x * x + wy * a * (0.5 * a - x);
+            sp(ii) -= VyI*x;
             break;
           case SECTION_RESPONSE_MY:
-            sp[ii] += VzI * x - 0.5 * wz * x * x - wz * a * (0.5 * a - x);
+            sp(ii) += VzI*x;
+            break;            
+          case SECTION_RESPONSE_VY:
+            sp(ii) -= VyI;
             break;
-          case SECTION_RESPONSE_VY: sp[ii] += -VyI + wy * (x - a); break;
-          case SECTION_RESPONSE_VZ: sp[ii] += -VzI + wz * (x - a); break;
-          default:                  break;
+          case SECTION_RESPONSE_VZ:
+        sp(ii) += VzI;
+            break;            
+          default:
+            break;
+          }
+        }
+        else if (x >= b) {
+          switch(scheme[ii]) {
+          case SECTION_RESPONSE_MZ:
+            sp(ii) += VyJ*(x-L);
+            break;
+          case SECTION_RESPONSE_MY:
+            sp(ii) -= VzJ*(x-L);
+            break;            
+          case SECTION_RESPONSE_VY:
+            sp(ii) += VyJ;
+            break;
+          case SECTION_RESPONSE_VZ:
+            sp(ii) -= VzJ;            
+            break;
+          default:
+            break;
+          }
+        }
+        else {
+          double wyy = wy + (wyb - wy) / (b - a) * (x - a);
+          double wzz = wz + (wzb - wz) / (b - a) * (x - a);
+          switch(scheme[ii]) {
+          case SECTION_RESPONSE_P:
+            sp(ii) += Fa - wa * (x - a) - 0.5 * (wab - wa) / (b - a) * (x - a) * (x - a);
+            break;
+          case SECTION_RESPONSE_MZ:
+            sp(ii) += -VyI * x + 0.5 * wy * (x - a) * (x - a) + 0.5 * (wyy - wy) * (x - a) * (x - a) / 3.0;
+            break;
+          case SECTION_RESPONSE_MY:
+            sp(ii) += VzI * x - 0.5 * wz * (x - a) * (x - a) - 0.5 * (wzz - wz) * (x - a) * (x - a) / 3.0;
+            break;            
+          case SECTION_RESPONSE_VY:
+            sp(ii) += -VyI + wy * (x - a) + 0.5 * (wyy - wy) * (x - a);
+            break;
+          case SECTION_RESPONSE_VZ:           
+            sp(ii) -= -VzI + wz * (x - a) - 0.5 * (wzz - wz) * (x - a);
+            break;
+          default:
+            break;
           }
         }
       }
-    } else if (type == LOAD_TAG_Beam3dPointLoad) {
+    }
+    else if (type == LOAD_TAG_Beam3dPointLoad) {
       double Py     = data(0) * loadFactor;
       double Pz     = data(1) * loadFactor;
       double N      = data(2) * loadFactor;
@@ -2500,7 +2543,6 @@ int
 ForceDeltaFrame3d::getResponse(int responseID, Information& info)
 {
   static Vector vp(6);
-  static Matrix fe(6, 6);
 
   if (responseID == 1)
     return info.setVector(this->getResistingForce());
@@ -2539,6 +2581,7 @@ ForceDeltaFrame3d::getResponse(int responseID, Information& info)
 
   // Plastic rotation
   else if (responseID == 4) {
+    static Matrix fe(6, 6);
     this->getInitialFlexibility(fe);
     vp = theCoordTransf->getBasicTrialDisp();
     vp.addMatrixVector(1.0, fe, q_pres, -1.0);
@@ -3972,210 +4015,6 @@ ForceDeltaFrame3d::computeReactionSensitivity(double* dp0dh, int gradNumber)
   }
 }
 
-void
-ForceDeltaFrame3d::computeReactions(double* p0)
-{
-  int type;
-  double L = theCoordTransf->getInitialLength();
-
-  for (int i = 0; i < eleLoads.size(); i++) {
-
-    double loadFactor  = eleLoadFactors[i];
-    const Vector& data = eleLoads[i]->getData(type, loadFactor);
-
-    if (type == LOAD_TAG_Beam3dUniformLoad) {
-      double wy = data(0) * loadFactor; // Transverse
-      double wz = data(1) * loadFactor; // Transverse
-      double wa = data(2) * loadFactor; // Axial
-
-      p0[0] -= wa * L;
-      double V = 0.5 * wy * L;
-      p0[1] -= V;
-      p0[2] -= V;
-      V = 0.5 * wz * L;
-      p0[3] -= V;
-      p0[4] -= V;
-    } else if (type == LOAD_TAG_Beam3dPartialUniformLoad) {
-      double wa = data(2) * loadFactor; // Axial
-      double wy = data(0) * loadFactor; // Transverse
-      double wz = data(1) * loadFactor; // Transverse
-      double a  = data(3) * L;
-      double b  = data(4) * L;
-
-      p0[0] -= wa * (b - a);
-      double Fy = wy * (b - a);
-      double c  = a + 0.5 * (b - a);
-      p0[1] -= Fy * (1 - c / L);
-      p0[2] -= Fy * c / L;
-      double Fz = wz * (b - a);
-      p0[3] -= Fz * (1 - c / L);
-      p0[4] -= Fz * c / L;
-    } else if (type == LOAD_TAG_Beam3dPointLoad) {
-      double Py     = data(0) * loadFactor;
-      double Pz     = data(1) * loadFactor;
-      double N      = data(2) * loadFactor;
-      double aOverL = data(3);
-
-      if (aOverL < 0.0 || aOverL > 1.0)
-        continue;
-
-      double V1 = Py * (1.0 - aOverL);
-      double V2 = Py * aOverL;
-      p0[0] -= N;
-      p0[1] -= V1;
-      p0[2] -= V2;
-      V1 = Pz * (1.0 - aOverL);
-      V2 = Pz * aOverL;
-      p0[3] -= V1;
-      p0[4] -= V2;
-    }
-  }
-}
-
-const Matrix &
-ForceDeltaFrame3d::getMass()
-{
-  if (!mass_initialized) {
-    total_mass = 0.0;
-    if (this->getIntegral(Field::Density, State::Init, total_mass) != 0)
-      total_mass = 0.0;
-    twist_mass = 0.0;
-    if (this->getIntegral(Field::PolarInertia, State::Init, twist_mass) != 0)
-      twist_mass = 0.0;
-
-    mass_initialized = true;
-  }
-
-  if (total_mass == 0.0) {
-
-      ALWAYS_STATIC MatrixND<12,12> M{0.0};
-      ALWAYS_STATIC Matrix Wrapper{M};
-      return Wrapper;
-
-  } else if (mass_flag == 0)  {
-
-      ALWAYS_STATIC MatrixND<12,12> M{0.0};
-      ALWAYS_STATIC Matrix Wrapper{M};
-      // lumped mass matrix
-      double m = 0.5*total_mass;
-      M(0,0) = m;
-      M(1,1) = m;
-      M(2,2) = m;
-      M(6,6) = m;
-      M(7,7) = m;
-      M(8,8) = m;
-      return Wrapper;
-
-  } else {
-      // consistent (cubic, prismatic) mass matrix
-
-      double L  = this->getLength(State::Init);
-      double m  = total_mass/420.0;
-      double mx = twist_mass;
-      ALWAYS_STATIC MatrixND<12,12> ml{0.0};
-
-      ml(0,0) = ml(6,6) = m*140.0;
-      ml(0,6) = ml(6,0) = m*70.0;
-
-      ml(3,3) = ml(9,9) = mx/3.0; // Twisting
-      ml(3,9) = ml(9,3) = mx/6.0;
-
-      ml( 2, 2) = ml( 8, 8) =  m*156.0;
-      ml( 2, 8) = ml( 8, 2) =  m*54.0;
-      ml( 4, 4) = ml(10,10) =  m*4.0*L*L;
-      ml( 4,10) = ml(10, 4) = -m*3.0*L*L;
-      ml( 2, 4) = ml( 4, 2) = -m*22.0*L;
-      ml( 8,10) = ml(10, 8) = -ml(2,4);
-      ml( 2,10) = ml(10, 2) =  m*13.0*L;
-      ml( 4, 8) = ml( 8, 4) = -ml(2,10);
-
-      ml( 1, 1) = ml( 7, 7) =  m*156.0;
-      ml( 1, 7) = ml( 7, 1) =  m*54.0;
-      ml( 5, 5) = ml(11,11) =  m*4.0*L*L;
-      ml( 5,11) = ml(11, 5) = -m*3.0*L*L;
-      ml( 1, 5) = ml( 5, 1) =  m*22.0*L;
-      ml( 7,11) = ml(11, 7) = -ml(1,5);
-      ml( 1,11) = ml(11, 1) = -m*13.0*L;
-      ml( 5, 7) = ml( 7, 5) = -ml(1,11);
-
-      // transform local mass matrix to global system
-      return theCoordTransf->getGlobalMatrixFromLocal(ml);
-  }
-}
-
-
-const Matrix &
-ForceDeltaFrame3d::getMass()
-{
-  if (!mass_initialized) {
-    total_mass = 0.0;
-    if (this->getIntegral(Field::Density, State::Init, total_mass) != 0)
-      total_mass = 0.0;
-
-    // Twisting inertia
-    twist_mass = 0.0;
-    if (this->getIntegral(Field::PolarInertia, State::Init, twist_mass) != 0)
-      twist_mass = 0.0;
-
-    mass_initialized = true;
-  }
-
-  if (total_mass == 0.0) {
-
-      ALWAYS_STATIC MatrixND<12,12> M{0.0};
-      ALWAYS_STATIC Matrix Wrapper{M};
-      return Wrapper;
-
-  } else if (mass_flag == 0)  {
-
-      ALWAYS_STATIC MatrixND<12,12> M{0.0};
-      ALWAYS_STATIC Matrix Wrapper{M};
-      // lumped mass matrix
-      double m = 0.5*total_mass;
-      M(0,0) = m;
-      M(1,1) = m;
-      M(2,2) = m;
-      M(6,6) = m;
-      M(7,7) = m;
-      M(8,8) = m;
-      return Wrapper;
-
-  } else {
-      // consistent (cubic, prismatic) mass matrix
-
-      double L  = this->getLength(State::Init);
-      double m  = total_mass/420.0;
-      double mx = twist_mass;
-      ALWAYS_STATIC MatrixND<12,12> ml{0.0};
-
-      ml(0,0) = ml(6,6) = m*140.0;
-      ml(0,6) = ml(6,0) = m*70.0;
-
-      ml(3,3) = ml(9,9) = mx/3.0; // Twisting
-      ml(3,9) = ml(9,3) = mx/6.0;
-
-      ml( 2, 2) = ml( 8, 8) =  m*156.0;
-      ml( 2, 8) = ml( 8, 2) =  m*54.0;
-      ml( 4, 4) = ml(10,10) =  m*4.0*L*L;
-      ml( 4,10) = ml(10, 4) = -m*3.0*L*L;
-      ml( 2, 4) = ml( 4, 2) = -m*22.0*L;
-      ml( 8,10) = ml(10, 8) = -ml(2,4);
-      ml( 2,10) = ml(10, 2) =  m*13.0*L;
-      ml( 4, 8) = ml( 8, 4) = -ml(2,10);
-
-      ml( 1, 1) = ml( 7, 7) =  m*156.0;
-      ml( 1, 7) = ml( 7, 1) =  m*54.0;
-      ml( 5, 5) = ml(11,11) =  m*4.0*L*L;
-      ml( 5,11) = ml(11, 5) = -m*3.0*L*L;
-      ml( 1, 5) = ml( 5, 1) =  m*22.0*L;
-      ml( 7,11) = ml(11, 7) = -ml(1,5);
-      ml( 1,11) = ml(11, 1) = -m*13.0*L;
-      ml( 5, 7) = ml( 7, 5) = -ml(1,11);
-
-      // transform local mass matrix to global system
-      return theCoordTransf->getGlobalMatrixFromLocal(ml);
-  }
-}
 
 void 
 ForceDeltaFrame3d::zeroLoad()

@@ -1,7 +1,8 @@
-/* ****************************************************************** **
-**    OpenSees - Open System for Earthquake Engineering Simulation    **
-**          Pacific Earthquake Engineering Research Center            **
-** ****************************************************************** */
+//===----------------------------------------------------------------------===//
+//
+//        OpenSees - Open System for Earthquake Engineering Simulation    
+//
+//===----------------------------------------------------------------------===//
 //
 // Description: This file contains the function invoked when the user invokes
 // the uniaxialMaterial command in the interpreter.
@@ -203,22 +204,6 @@ dispatch(ClientData clientData, Tcl_Interp* interp, int argc, G3_Char** const ar
   assert(clientData != nullptr);
   return fn( clientData, interp, argc, argv );
 }
-
-#if 0
-class broker_ {
- Tcl_CmdProc*      parse;
- virtual UniaxialMaterial* alloc();
-};
-
-template <class C> class broker: public broker_ {
-  broker(Tcl_CmdProc* parse_): parse(parse_) {};
-};
-
-std::unordered_map<std::string, Tcl_CmdProc*> uniaxial_dispatch_2 {
-    {"Concrete01",             broker<>(dispatch<OPS_Concrete01>)      },
-    {"Concrete02",             dispatch<OPS_Concrete02>                },
-};
-#endif
 
 std::unordered_map<std::string, Tcl_CmdProc*> uniaxial_dispatch {
     {"APDFMD", dispatch<OPS_APDFMD> },

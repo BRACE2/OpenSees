@@ -29,20 +29,22 @@ class PrismFrame2d : public Element
     PrismFrame2d(int tag, double A, double E, double I, 
                   int Nd1, int Nd2, CrdTransf &theTransf,
                   double alpha, double depth,
-                  double rho, int cMass,
+                  double rho, int mass_flag,
                   int release, int geom_flag);
 
     PrismFrame2d(int tag, 
                  int Nd1, int Nd2, 
                   FrameSection& theSection, CrdTransf &theTransf,
                   double alpha, double depth,
-                  double rho, int cMass, bool use_mass,
+                  double rho, int mass_flag, bool use_mass,
                   int release,
                   int geom_flag);
 
     ~PrismFrame2d();
 
-    const char *getClassType() const {return "PrismFrame2d";};
+    const char *getClassType() const {
+      return "PrismFrame2d";
+    }
     static constexpr const char* class_name = "PrismFrame2d";
 
     int getNumExternalNodes() const;
@@ -82,13 +84,20 @@ class PrismFrame2d : public Element
   private:
     void formBasicStiffness(OpenSees::MatrixND<3,3> &) const;
 
-    // Model parameters
-    double A,E,I;     // area, elastic modulus, moment of inertia
-    double alpha,     // coeff. of thermal expansion,
-           depth;     // depth
-    double rho;       // mass per unit length
+    constexpr static int NEN = 2;
 
-    int cMass;        // consistent mass flag
+    // Section parameters
+    double E;      // elastic modulus
+    double G;      // shear modulus
+    double A;      // cross section (axial) area
+    double Iz;     // moment of inertia about local z axis
+    double Ay;     // shear area along local y axis
+    double phi;    // ratio of bending to shear stiffness
+    double rho;    // mass per unit length
+    double alpha,  // Thermal parameters
+           depth;
+
+    int mass_flag;        // consistent mass flag
     int release;      // moment release 0=none, 1=I, 2=J, 3=I,J
     int geom_flag;
 
